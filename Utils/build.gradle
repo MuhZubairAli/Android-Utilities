@@ -54,18 +54,3 @@ dependencies {
     implementation libs.volley
     implementation libs.annotations
 }
-
-
-afterEvaluate {
-    publishing {
-        publications {
-            release(MavenPublication) {
-                from components.findByName('release')
-
-                groupId = 'com.github.MuhZubairAli'
-                artifactId = 'Utils'
-                version = '1.0.1'
-            }
-        }
-    }
-}
