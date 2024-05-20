@@ -49,7 +49,7 @@ maven {
     url uri('https://maven.pkg.github.com/MuhZubairAli/*')
     credentials {
         username 'MuhZubairAli'
-        password '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'
+        password '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'
     }
 }
 ```
