@@ -24,14 +24,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.List;
 
 public class FileManager {
-    private final String TAG = "FileUtils";
+    private final String TAG = "FileManager";
     private static final int REQUEST_EXTERNAL_STORAGE_CODE = 20;
-    private static final String[] PERMISSIONS_REQUIRED = {
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-    };
     protected Context mContext;
 
     public FileManager(Context context){
@@ -39,13 +36,23 @@ public class FileManager {
     }
 
     public static String[] getPermissionsRequired(){
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            String[] permissions = new String[PERMISSIONS_REQUIRED.length + 1];
-            System.arraycopy(PERMISSIONS_REQUIRED, 0, permissions, 0, PERMISSIONS_REQUIRED.length);
-            permissions[PERMISSIONS_REQUIRED.length] = Manifest.permission.MANAGE_EXTERNAL_STORAGE;
-            return permissions;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            return new String[]{
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_AUDIO,
+                    Manifest.permission.READ_MEDIA_VIDEO
+            };
         }
-        return PERMISSIONS_REQUIRED;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return new String[]{
+                    Manifest.permission.MANAGE_EXTERNAL_STORAGE
+            };
+        } else {
+            return new String[]{
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+            };
+        }
     }
 
     /**
@@ -56,11 +63,14 @@ public class FileManager {
      * that one or more permissions regarding storage are not granted
      */
     public static boolean hasPermissions(Context context) {
-        boolean has = true;
-        for (String perm : getPermissionsRequired())
-            has = has & ActivityCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+            return Environment.isExternalStorageManager();
+        }else {
+            int write = ActivityCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            int read = ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE);
 
-        return has && (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager());
+            return read == PackageManager.PERMISSION_GRANTED && write == PackageManager.PERMISSION_GRANTED;
+        }
     }
 
     /**
@@ -68,16 +78,18 @@ public class FileManager {
      * For API >= 30 it opens up the activity to allow current app the permission to manage all files
      */
     public static void requestPermissions(Activity context){
-        if (!hasPermissions(context)) {
-            ActivityCompat.requestPermissions(
-                    context,
-                    getPermissionsRequired(),
-                    REQUEST_EXTERNAL_STORAGE_CODE
-            );
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            requestForFileManagerPermission(context);
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+            if (!hasPermissions(context)) {
+                requestForFileManagerPermission(context);
+            }
+        }else {
+            if (!hasPermissions(context)) {
+                ActivityCompat.requestPermissions(
+                        context,
+                        getPermissionsRequired(),
+                        REQUEST_EXTERNAL_STORAGE_CODE
+                );
+            }
         }
     }
 
@@ -89,9 +101,7 @@ public class FileManager {
     @RequiresApi(api = Build.VERSION_CODES.R)
     public static void requestForFileManagerPermission(Context context){
         StaticUtils.getHandler().post(()->{
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-                Toast.makeText(context, "On API 30 and above permission to manage all files is required, Please enable the option of \'Allow access to manage all files\'.", Toast.LENGTH_SHORT).show();
-            }
+            Toast.makeText(context, "On API 30 and above permission to manage all files is required, Please enable the option of \'Allow access to manage all files\'.", Toast.LENGTH_SHORT).show();
         });
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()){

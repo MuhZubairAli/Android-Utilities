@@ -27,6 +27,10 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
@@ -72,6 +76,17 @@ public abstract class CustomActivity extends AppCompatActivity {
     private LayoutInflater mLayoutInflater;
     protected UXToolkit mUXToolkit;
     protected FileManager mFileManager;
+    private final ActivityResultLauncher<Intent> storageActivityResultLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    new ActivityResultCallback<ActivityResult>(){
+                        @Override
+                        public void onActivityResult(ActivityResult o) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                if(!Environment.isExternalStorageManager())
+                                    showAlertAppPermissionsSetting();
+                            }
+                        }
+                    });
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -101,7 +116,7 @@ public abstract class CustomActivity extends AppCompatActivity {
             stopLocationService();
         }
     }
-
+    //For android 11 and below, onRequestPermissionsResult() will be called
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -159,13 +174,9 @@ public abstract class CustomActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             mPermissions.add(Manifest.permission.FOREGROUND_SERVICE);
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            mSpecialPermissions.add(Manifest.permission.MANAGE_EXTERNAL_STORAGE);
-        }
     }
 
-    private String[] getAllPermissions(){
+    protected String[] getAllPermissions(){
         String[] permissions = new String[
                 mPermissions.size() +
                 LocationService.getPermissionsRequired().length +
@@ -238,16 +249,21 @@ public abstract class CustomActivity extends AppCompatActivity {
     }
 
     protected void requestPermissions(int requestCode, String[] permissions){
-        ActivityCompat.requestPermissions(
-                this,
-                permissions,
-                requestCode
-        );
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            ActivityCompat.requestPermissions(
+                    this,
+                    permissions,
+                    requestCode
+            );
+        }
     }
 
     protected void requestSpecialPermissions(){
         for (String perm : mSpecialPermissions){
             if (perm.equals(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !Environment.isExternalStorageManager()) {
+                    storageActivityResultLauncher.launch(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + this.getPackageName())));
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
                     StaticUtils.getHandler().post(() -> {
                         mUXToolkit.showToast("On API 30 and above permission to manage all files is required, Please enable the option of 'Allow access to manage all files'.");
