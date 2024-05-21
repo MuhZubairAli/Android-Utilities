@@ -40,7 +40,9 @@ public class PermissionActivity extends CustomActivity {
     }
 
     private void showPermissionsTable(){
-        tblPerms.removeAllViewsInLayout();
+        for (int i=1; i < tblPerms.getChildCount(); i++){
+            tblPerms.removeView(tblPerms.getChildAt(i));
+        }
         for (String perm : getAllPermissions()) {
             addPermissionRow(perm, getStatusLabel(perm));
         }

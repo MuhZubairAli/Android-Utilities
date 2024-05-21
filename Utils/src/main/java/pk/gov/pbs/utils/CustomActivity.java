@@ -73,6 +73,7 @@ public abstract class CustomActivity extends AppCompatActivity {
     private final List<String> mPermissions = new ArrayList<>();
     private final List<String> mSpecialPermissions = new ArrayList<>(5);
 
+    private ActivityResultLauncher<String[]> requestPermissionLauncher;
     private LayoutInflater mLayoutInflater;
     protected UXToolkit mUXToolkit;
     protected FileManager mFileManager;
@@ -174,6 +175,13 @@ public abstract class CustomActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             mPermissions.add(Manifest.permission.FOREGROUND_SERVICE);
         }
+
+        requestPermissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
+                permissions -> {
+                    // Handle permission results here
+                    mUXToolkit.showToast("permission result received");
+                });
     }
 
     protected String[] getAllPermissions(){
@@ -249,7 +257,9 @@ public abstract class CustomActivity extends AppCompatActivity {
     }
 
     protected void requestPermissions(int requestCode, String[] permissions){
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            requestPermissionLauncher.launch(permissions);
+        } else {
             ActivityCompat.requestPermissions(
                     this,
                     permissions,
