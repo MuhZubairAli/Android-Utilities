@@ -1,5 +1,6 @@
 package pk.gov.pbs.utils_project;
 
+import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.widget.TableLayout;
@@ -14,6 +15,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import pk.gov.pbs.utils.CustomActivity;
+import pk.gov.pbs.utils.FileManager;
 
 public class PermissionActivity extends CustomActivity {
     TableLayout tblPerms;
@@ -61,6 +63,9 @@ public class PermissionActivity extends CustomActivity {
     }
 
     private String getStatusLabel(String perm) {
+        if (perm.equals(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) {
+            return FileManager.hasFileManagerPermission() ? "GRANTED" : "DENIED";
+        }
         int status = ActivityCompat.checkSelfPermission(this, perm);
         return status == PackageManager.PERMISSION_GRANTED ? "GRANTED" : "DENIED";
     }

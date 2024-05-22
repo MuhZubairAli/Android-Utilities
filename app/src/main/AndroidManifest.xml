@@ -13,6 +13,9 @@
         android:theme="@style/Theme.AndroidUtilities"
         tools:targetApi="31">
         <activity
+            android:name=".FileManagerActivity"
+            android:exported="false" />
+        <activity
             android:name=".PermissionActivity"
             android:exported="false" />
         <activity

@@ -1,8 +1,6 @@
 package pk.gov.pbs.utils;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -26,10 +24,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import androidx.activity.result.ActivityResult;
-import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -43,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Stack;
 
 import pk.gov.pbs.utils.exceptions.InvalidIndexException;
 import pk.gov.pbs.utils.location.ILocationChangeCallback;
@@ -62,6 +58,8 @@ public abstract class CustomActivity extends AppCompatActivity {
     private boolean USING_LOCATION_SERVICE = false;
     private ActionBar actionBar;
     private AlertDialog dialogLocationSettings;
+    private AlertDialog dialogStorageManagerPermission;
+    private AlertDialog dialogAppSettings;
 
     private Runnable mAfterLocationServiceStartCallback;
     private LocationService mLocationService = null;
@@ -69,10 +67,9 @@ public abstract class CustomActivity extends AppCompatActivity {
     private BroadcastReceiver GPS_PROVIDER_ACCESS = null;
     private static byte mLocationAttachAttempts = 0;
 
-    private static final int PERMISSIONS_REQUEST_FIRST = 100;
-    private static final int PERMISSIONS_REQUEST_SECOND = 101;
     private final List<String> mPermissions = new ArrayList<>();
     private final List<String> mSpecialPermissions = new ArrayList<>(2);
+    private final Stack<PermissionRequest> mSpecialPermissionRequests = new Stack<>();
     private ActivityResultLauncher<String[]> requestPermissionLauncher;
 
     private LayoutInflater mLayoutInflater;
@@ -94,6 +91,9 @@ public abstract class CustomActivity extends AppCompatActivity {
                     showAlertLocationSettings();
             }
         }
+
+        if (!mSpecialPermissionRequests.isEmpty())
+            mSpecialPermissionRequests.pop().askPermission();
     }
 
     @Override
@@ -190,9 +190,6 @@ public abstract class CustomActivity extends AppCompatActivity {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             mPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             mSpecialPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
         }
 
@@ -215,22 +212,25 @@ public abstract class CustomActivity extends AppCompatActivity {
                         if (showRationale) {
                             mUXToolkit.showConfirmDialogue(
                                 "Permission Required"
-                                , "App requires all requested permissions to work properly, Kindly grant all requested permissions"
+                                , "All requested permissions are required to work properly, Kindly grant all the requested permissions"
+                                , "Open Permissions Settings"
                                 , "Request Again"
-                                , "Cancel"
                                 , new UXEventListeners.ConfirmDialogueEventsListener() {
                                     @Override
                                     public void onCancel(DialogInterface dialog, int which) {
-                                        dialog.dismiss();
+                                        requestPermissions(deniedPermission.toArray(new String[0]));
                                     }
 
                                     @Override
                                     public void onOK(DialogInterface dialog, int which) {
-                                        requestPermissions(deniedPermission.toArray(new String[0]));
+                                        openAppSettingsActivity();
                                     }
                                 });
                         } else {
-                            showAlertAppPermissionsSetting();
+                            if (permissions.size() == 1 && permissions.containsKey(Manifest.permission.MANAGE_EXTERNAL_STORAGE))
+                                requestSpecialPermissions();
+                            else
+                                showAlertAppPermissionsSetting();
                         }
                     } else if (deniedPermission.isEmpty() && !permissions.isEmpty()) {
                         requestSpecialPermissions();
@@ -311,25 +311,38 @@ public abstract class CustomActivity extends AppCompatActivity {
     protected void requestSpecialPermissions(){
         for (String perm : getSpecialPermissions()){
             if (perm.equals(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && !Environment.isExternalStorageManager()) {
-                    mUXToolkit.showAlertDialogue("Storage Manager Permission", "On API 30 and above permission to manage all files is required, Please enable the option of 'Allow access to manage all files'.", "Open Storage Manager Settings", new UXEventListeners.AlertDialogueEventListener() {
-                        @Override
-                        public void onOK(DialogInterface dialog, int which) {
-                            Uri uri = Uri.parse("package:" + CustomActivity.this.getPackageName());
-                            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, uri);
-                            startActivity(intent);
+                mSpecialPermissionRequests.push(
+                    new PermissionRequest(
+                        "In order to read and write files to external storage, Permission to manage all files is required, Please enable the option of 'Allow access to manage all files' on next screen."
+                        , ()-> {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && !Environment.isExternalStorageManager()) {
+                                Uri uri = Uri.parse("package:" + CustomActivity.this.getPackageName());
+                                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, uri);
+                                startActivity(intent);
+                            }
                         }
-                    });
-
-                }
+                    )
+                );
             } else if (perm.equals(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION});
-                }
+                mSpecialPermissionRequests.push(
+                    new PermissionRequest(
+                        "This application requires background location to work properly, Please enable the option of 'Allow all the time' on Location Permissions screen."
+                        , ()->{
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION});
+                            }
+                        }
+                    )
+                );
             } else { // else if(other special permission) handle requesting of other special permission (if any)
                 throw new RuntimeException("Special permission ["+perm+"] is not has the implementation for requesting permission yet");
             }
+            mSpecialPermissions.remove(perm);
         }
+
+        // Initiating the loop of requesting special permissions, other permissions requests are handled in on onResume()
+        if (!mSpecialPermissionRequests.isEmpty())
+            mSpecialPermissionRequests.pop().askPermission();
     }
 
     //only call this from Activity construction
@@ -580,11 +593,22 @@ public abstract class CustomActivity extends AppCompatActivity {
         }
     }
 
+    private void openAppSettingsActivity() {
+        final Intent i = new Intent();
+        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        i.addCategory(Intent.CATEGORY_DEFAULT);
+        i.setData(Uri.parse("package:" + getPackageName()));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        startActivity(i);
+    }
+
     protected void showAlertAppPermissionsSetting(){
         try {
             if (!isDestroyed() && !isFinishing()) {
-                if(dialogLocationSettings == null) {
-                    dialogLocationSettings = mUXToolkit.buildConfirmDialogue(
+                if(dialogAppSettings == null) {
+                    dialogAppSettings = mUXToolkit.buildConfirmDialogue(
                             getString(R.string.alert_dialog_all_permissions_title)
                             , getString(R.string.alert_dialog_all_permissions_message)
                             , getString(R.string.label_btn_permissions_settings)
@@ -592,27 +616,20 @@ public abstract class CustomActivity extends AppCompatActivity {
                             , new UXEventListeners.ConfirmDialogueEventsListener() {
                                 @Override
                                 public void onCancel(DialogInterface dialog, int which) {
-                                    dialogLocationSettings.dismiss();
+                                    dialogAppSettings.dismiss();
                                 }
 
                                 @Override
                                 public void onOK(DialogInterface dialog, int which) {
-                                    final Intent i = new Intent();
-                                    i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                                    i.addCategory(Intent.CATEGORY_DEFAULT);
-                                    i.setData(Uri.parse("package:" + getPackageName()));
-                                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                    i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                                    i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-                                    startActivity(i);
+                                    openAppSettingsActivity();
                                 }
                             }
 
                     );
                 }
 
-                if(!dialogLocationSettings.isShowing())
-                    dialogLocationSettings.show();
+                if(!dialogAppSettings.isShowing())
+                    dialogAppSettings.show();
             }
         } catch (Exception e){
             ExceptionReporter.handle(e);
@@ -642,4 +659,31 @@ public abstract class CustomActivity extends AppCompatActivity {
         }
     }
 
+    private class PermissionRequest {
+        private final String permissionRequestStatement;
+        private final Runnable permissionCallback;
+        public PermissionRequest(String statement, Runnable callback){
+            permissionRequestStatement = statement;
+            permissionCallback = callback;
+        }
+        public void askPermission() {
+            mUXToolkit.showConfirmDialogue(
+                    "Permission Required"
+                    , permissionRequestStatement
+                    , "Proceed Request"
+                    , "Cancel"
+                    , new UXEventListeners.ConfirmDialogueEventsListener() {
+                        @Override
+                        public void onCancel(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+
+                        @Override
+                        public void onOK(DialogInterface dialog, int which) {
+                            permissionCallback.run();
+                        }
+                    }
+            );
+        }
+    }
 }

@@ -96,6 +96,19 @@ public class FileManager {
     }
 
     /**
+     * For API >= 30 and API < 33 this method checks if current app has permission to manage all files
+     * for other API return true by default because api < 30 don't need it
+     * and API >= 33 it already has it
+     * @return true if app has permission to manage all files, false otherwise
+     */
+    public static boolean hasFileManagerPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return Environment.isExternalStorageManager();
+        }
+        return true;
+    }
+
+    /**
      * For API >= 30 this method opens screen for allowing current app to be
      * Manage Application for All Files Access Permission
      * This is required for CRUD operations
@@ -113,6 +126,7 @@ public class FileManager {
             context.startActivity(intent);
         }
     }
+
     /**
      * @param mode :
      *          Context.MODE_APPEND     --> write more to exist file.

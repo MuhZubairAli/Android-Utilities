@@ -32,7 +32,7 @@
                 android:layout_height="wrap_content"
                 android:textAppearance="@style/TextAppearance.AppCompat.Medium"
                 android:gravity="center"
-                android:layout_marginBottom="@dimen/spaceBigger"
+                android:layout_marginBottom="@dimen/spaceSmall"
                 />
 
             <Button

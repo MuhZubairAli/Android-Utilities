@@ -3,16 +3,11 @@
     <item>
         <shape>
             <gradient
-                android:startColor="#FFDDDDDD"
+                android:startColor="#FFBBBBBB"
                 android:endColor="#FFFEFEFE"
                 android:angle="270" />
             <corners
                 android:radius="@dimen/cornerRoundRadius" />
-            <padding
-                android:left="@dimen/spacePrimary"
-                android:top="@dimen/spacePrimary"
-                android:right="@dimen/spacePrimary"
-                android:bottom="@dimen/spacePrimary" />
         </shape>
     </item>
 </selector>
