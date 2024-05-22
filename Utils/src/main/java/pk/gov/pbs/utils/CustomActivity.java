@@ -311,18 +311,18 @@ public abstract class CustomActivity extends AppCompatActivity {
     protected void requestSpecialPermissions(){
         for (String perm : getSpecialPermissions()){
             if (perm.equals(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) {
-                mSpecialPermissionRequests.push(
-                    new PermissionRequest(
-                        "In order to read and write files to external storage, Permission to manage all files is required, Please enable the option of 'Allow access to manage all files' on next screen."
-                        , ()-> {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && !Environment.isExternalStorageManager()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && !Environment.isExternalStorageManager()) {
+                    mSpecialPermissionRequests.push(
+                        new PermissionRequest(
+                            "In order to read and write files to external storage, Permission to manage all files is required, Please enable the option of 'Allow access to manage all files' on next screen."
+                            , ()-> {
                                 Uri uri = Uri.parse("package:" + CustomActivity.this.getPackageName());
                                 Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, uri);
                                 startActivity(intent);
                             }
-                        }
-                    )
-                );
+                        )
+                    );
+                }
             } else if (perm.equals(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
                 mSpecialPermissionRequests.push(
                     new PermissionRequest(
