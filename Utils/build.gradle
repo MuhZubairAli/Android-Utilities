@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    id 'maven-publish'
 }
 
 android {
@@ -8,7 +7,7 @@ android {
     compileSdk 34
 
     defaultConfig {
-        minSdk 23
+        minSdk 21
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -36,18 +35,4 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-}
-
-afterEvaluate {
-    publishing {
-        publications {
-            release(MavenPublication) {
-                from components.findByName('release')
-
-                groupId = 'com.github.muhzubairali'
-                artifactId = 'utils'
-                version = '1.0.1'
-            }
-        }
-    }
 }

@@ -22,9 +22,8 @@ public class MainActivity extends CustomActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-        checkAllPermissions();
-        ((TextView) findViewById(R.id.tvApiLevel)).setText(Utils.getDeviceOS());
 
+        ((TextView) findViewById(R.id.tvApiLevel)).setText(Utils.getDeviceOS());
         findViewById(R.id.btnPermissions).setOnClickListener(v -> {
             startActivity(new Intent(this, PermissionActivity.class));
         });

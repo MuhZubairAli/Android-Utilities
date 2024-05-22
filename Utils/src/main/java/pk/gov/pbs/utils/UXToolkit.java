@@ -88,7 +88,7 @@ public class UXToolkit {
                             positiveButtonLabel
                             , (dialog, which) -> {
                                 if(callback != null)
-                                    callback.onOK();
+                                    callback.onOK(dialog, which);
                             }
                     )
                     .create();
@@ -99,8 +99,8 @@ public class UXToolkit {
                     .setPositiveButton(
                             positiveButtonLabel
                             , (dialog, which) -> {
-                                if (callback != null)
-                                    callback.onOK();
+                                if(callback != null)
+                                    callback.onOK(dialog, which);
                             }
                     )
                     .create();
@@ -108,17 +108,49 @@ public class UXToolkit {
         return alertDialog;
     }
 
+    public AlertDialog buildConfirmDialogue(String title, String message, @Nullable String positiveBtnLabel, @Nullable String negativeBtnLabel, UXEventListeners.ConfirmDialogueEventsListener events) {
+        if (positiveBtnLabel == null)
+            positiveBtnLabel = context.getResources().getString(R.string.label_btn_ok);
+        if (negativeBtnLabel == null)
+            negativeBtnLabel = "Cancel";
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                Spanned htm = Html.fromHtml(message);
+                return getDialogBuilder()
+                        .setTitle(title)
+                        .setMessage(htm)
+                        .setCancelable(false)
+                        .setPositiveButton(positiveBtnLabel, events::onOK)
+                        .setNegativeButton(negativeBtnLabel, events::onCancel)
+                        .create();
+            } catch (Exception e) {
+                ExceptionReporter.handle(e);
+            }
+        } else {
+            try {
+                return getDialogBuilder()
+                        .setView(inflateInfoAlertDialogue(title, message))
+                        .setCancelable(false)
+                        .setPositiveButton(
+                                positiveBtnLabel
+                                , events::onOK)
+                        .setNegativeButton(
+                                negativeBtnLabel
+                                , events::onCancel)
+                        .create();
+            } catch (Exception e) {
+                ExceptionReporter.handle(e);
+            }
+        }
+        return null;
+    }
+
     public void showAlertDialogue(String title, String message, String positiveButtonLabel, @Nullable UXEventListeners.AlertDialogueEventListener event){
         StaticUtils.getHandler().post(()->{
             try {
                 buildAlertDialogue(title, message, positiveButtonLabel, event).show();
             } catch (Exception e){
-                Spanned htm = Html.fromHtml(message);
-                showToast(htm);
-
-                if(event != null)
-                    event.onOK();
-
                 ExceptionReporter.handle(e);
             }
         });
@@ -164,12 +196,8 @@ public class UXToolkit {
                         .setTitle(title)
                         .setMessage(htm)
                         .setCancelable(false)
-                        .setPositiveButton(positiveBtnLabel, (dialog1, which) -> {
-                            events.onOK();
-                        })
-                        .setNegativeButton(negativeBtnLabel, (dialog12, which) -> {
-                            events.onCancel();
-                        })
+                        .setPositiveButton(positiveBtnLabel, events::onOK)
+                        .setNegativeButton(negativeBtnLabel, events::onCancel)
                         .create();
 
                 dialog.show();
@@ -182,17 +210,11 @@ public class UXToolkit {
                 AlertDialog alert = getDialogBuilder()
                         .setView(inflateInfoAlertDialogue(title, message))
                         .setCancelable(false)
-                        .setPositiveButton(
-                                positiveBtnLabel
-                                , (dialog, which) -> events.onOK())
-                        .setNegativeButton(
-                                negativeBtnLabel
-                                , (dialog, which) -> events.onCancel())
+                        .setPositiveButton(positiveBtnLabel, events::onOK)
+                        .setNegativeButton(negativeBtnLabel, events::onCancel)
                         .create();
                 alert.show();
                 return alert;
-            } catch (WindowManager.BadTokenException e) {
-                ExceptionReporter.handle(e);
             } catch (Exception e) {
                 ExceptionReporter.handle(e);
             }
@@ -208,12 +230,8 @@ public class UXToolkit {
                         .setTitle(title)
                         .setMessage(htm)
                         .setCancelable(false)
-                        .setPositiveButton(R.string.label_btn_ok, (dialog1, which) -> {
-                            events.onOK();
-                        })
-                        .setNegativeButton(R.string.label_btn_cancel, (dialog12, which) -> {
-                            events.onCancel();
-                        })
+                        .setPositiveButton(R.string.label_btn_ok, events::onOK)
+                        .setNegativeButton(R.string.label_btn_cancel, events::onCancel)
                         .create();
 
                 dialog.show();
@@ -229,12 +247,12 @@ public class UXToolkit {
                         .setCancelable(false)
                         .setPositiveButton(
                                 R.string.label_btn_ok
-                                , (dialog, which) -> events.onOK())
+                                , events::onOK)
                         .setNegativeButton(
                                 context
                                         .getResources()
                                         .getString(R.string.label_btn_cancel)
-                                , (dialog, which) -> events.onCancel())
+                                , events::onCancel)
                         .create();
                 alert.show();
                 return true;

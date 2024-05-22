@@ -19,7 +19,7 @@ public class PermissionActivity extends CustomActivity {
     TableLayout tblPerms;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        PermissionActivity.super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_permission);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
@@ -31,6 +31,10 @@ public class PermissionActivity extends CustomActivity {
         tblPerms = findViewById(R.id.tblPerms);
         ((TextView) findViewById(R.id.tvApiLevel)).setText(Utils.getDeviceOS());
         showPermissionsTable();
+        findViewById(R.id.btnRefresh).setOnClickListener(v -> {
+            checkAllPermissions();
+            showPermissionsTable();
+        });
     }
 
     @Override
@@ -40,13 +44,15 @@ public class PermissionActivity extends CustomActivity {
     }
 
     private void showPermissionsTable(){
-        for (int i=1; i < tblPerms.getChildCount(); i++){
-            tblPerms.removeView(tblPerms.getChildAt(i));
-        }
+        TableRow header = (TableRow) tblPerms.getChildAt(0);
+        tblPerms.removeAllViews();
+        tblPerms.addView(header);
+
         for (String perm : getAllPermissions()) {
             addPermissionRow(perm, getStatusLabel(perm));
         }
     }
+
     private void addPermissionRow(String perm, String status) {
         TableRow row = (TableRow) getLayoutInflater().inflate(R.layout.perm_row, tblPerms, false);
         ((TextView) row.findViewById(R.id.tv_1)).setText(perm.replace("android.permission.", ""));
