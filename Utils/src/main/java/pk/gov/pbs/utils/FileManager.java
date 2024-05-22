@@ -102,7 +102,7 @@ public class FileManager {
      * @return true if app has permission to manage all files, false otherwise
      */
     public static boolean hasFileManagerPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU) {
             return Environment.isExternalStorageManager();
         }
         return true;
