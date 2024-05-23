@@ -86,7 +86,7 @@
                 android:layout_marginTop="@dimen/spaceSmall"
                 android:singleLine="false"
                 android:lines="3"
-                android:hint="Enter file content here"/>
+                android:hint="Enter file content for external file"/>
 
             <Button
                 android:layout_width="match_parent"
@@ -103,7 +103,7 @@
                 android:layout_marginTop="@dimen/spaceSmall"
                 android:singleLine="false"
                 android:lines="3"
-                android:hint="Enter file content here"/>
+                android:hint="Enter file content for internal file"/>
 
             <Button
                 android:layout_width="match_parent"

@@ -84,14 +84,14 @@ public class FileManager {
             if (!hasPermissions(context)) {
                 requestForFileManagerPermission(context);
             }
-        }else {
-            if (!hasPermissions(context)) {
-                ActivityCompat.requestPermissions(
-                        context,
-                        getPermissionsRequired(),
-                        REQUEST_EXTERNAL_STORAGE_CODE
-                );
-            }
+        }
+
+        if (!hasPermissions(context)) {
+            ActivityCompat.requestPermissions(
+                    context,
+                    getPermissionsRequired(),
+                    REQUEST_EXTERNAL_STORAGE_CODE
+            );
         }
     }
 
