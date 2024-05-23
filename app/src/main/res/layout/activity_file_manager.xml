@@ -22,14 +22,7 @@
         android:layout_height="wrap_content"
         android:textAppearance="@style/TextAppearance.AppCompat.Medium"
         android:gravity="center"
-        android:layout_marginBottom="@dimen/spaceBigger"
-        />
-
-    <Button
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Verify Permissions"
-        android:onClick="verifyPermissions"
+        android:layout_marginBottom="@dimen/spaceSmall"
         />
 
     <ScrollView
@@ -40,6 +33,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Verify Permissions"
+                android:onClick="verifyPermissions"
+                />
 
             <TableLayout
                 android:id="@+id/tblExternalFiles"
@@ -71,45 +71,49 @@
 
             </TableLayout>
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Create File External"
-                android:onClick="createFileExternal"
-                />
-
             <EditText
-                android:id="@+id/etTextExternal"
+                android:id="@+id/etText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/spaceSmall"
                 android:layout_marginTop="@dimen/spaceSmall"
                 android:singleLine="false"
                 android:lines="3"
-                android:hint="Enter file content for external file"/>
+                android:hint="Enter file content for file text"/>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Create File External Public"
+                android:onClick="createFileExternal"
+                />
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Read File External Public"
+                android:onClick="readFileExternal"
+                />
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Create File External Private"
+                android:onClick="createFilePrivate"
+                />
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Read File External Private"
+                android:onClick="readFilePrivate"
+                />
 
             <Button
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Create File Internal"
                 android:onClick="createFileInternal"
-                />
-
-            <EditText
-                android:id="@+id/etTextInternal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="@dimen/spaceSmall"
-                android:layout_marginTop="@dimen/spaceSmall"
-                android:singleLine="false"
-                android:lines="3"
-                android:hint="Enter file content for internal file"/>
-
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Read File External"
-                android:onClick="readFileExternal"
                 />
 
             <Button

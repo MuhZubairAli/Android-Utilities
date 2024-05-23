@@ -9,7 +9,6 @@ import android.widget.TableRow;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -68,17 +67,40 @@ public class FileManagerActivity extends CustomActivity {
 
 
     public void createFileExternal(View view) {
-        String content = ((EditText) findViewById(R.id.etTextExternal)).getText().toString();
+        String content = ((EditText) findViewById(R.id.etText)).getText().toString();
+        if(
         mFileManager.writeFile(
-                mFileManager.getExternalPublicDirectory("Utils","external","files")
-                ,"external.txt"
+                mFileManager.getFileExternalPublic("Test","File","Another","Test.txt")
                 ,content
-        );
-    }
-
-    public void createFileInternal(View view) {
+                , MODE_APPEND
+        ))
+            mUXToolkit.showToast("External File Created");
     }
 
     public void readFileExternal(View view) {
+        String content = mFileManager.readFile(mFileManager.getFileExternalPublic("Test","File","Another","Test.txt"));
+        mUXToolkit.showAlertDialogue("External Public File", content);
     }
+
+    public void createFilePrivate(View view) {
+        String content = ((EditText) findViewById(R.id.etText)).getText().toString();
+        if(mFileManager.writeFileExternalPrivate("Test", "Text", "file.txt", content, MODE_APPEND))
+            mUXToolkit.showToast("External Private File Created");
+    }
+
+    public void readFilePrivate(View view) {
+        String content = mFileManager.readFileExternalPrivate("Test", "Text", "internal.txt");
+        mUXToolkit.showAlertDialogue("External Private File", content);
+    }
+    public void createFileInternal(View view) {
+        String content = ((EditText) findViewById(R.id.etText)).getText().toString();
+        if(mFileManager.writeFileInternal("internal.txt", content, MODE_APPEND))
+            mUXToolkit.showToast("Internal File Created");
+    }
+
+    public void readFileInternal(View view) {
+        String content = mFileManager.readFileInternal("internal.txt");
+        mUXToolkit.showAlertDialogue("Internal Public File", content);
+    }
+
 }
