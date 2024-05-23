@@ -65,5 +65,4 @@ dependencies {
 ```
 To get the latest version click package, the latest package details could be found in POM (or in the title)
 
-
 ![image](https://github.com/MuhZubairAli/Android-Utilities/assets/22114590/5282a33f-4c10-405d-b737-ddd5fc946c08)
