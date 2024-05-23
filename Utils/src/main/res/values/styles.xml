@@ -2,6 +2,7 @@
 <resources>
     <style name="AlertDialogTheme" parent="ThemeOverlay.AppCompat.Dialog.Alert">
         <item name="android:windowBackground">@drawable/gradient_primary_dialogue</item>
+        <item name="android:textColor">@android:color/black</item>
     </style>
 
     <!-- Text Styles -->

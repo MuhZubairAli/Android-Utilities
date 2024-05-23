@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId "pk.gov.pbs.utils_project"
-        minSdk 23
+        minSdk 21
         targetSdk 34
         versionCode 1
         versionName "1.0"

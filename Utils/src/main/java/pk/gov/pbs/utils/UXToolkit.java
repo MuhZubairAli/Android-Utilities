@@ -88,7 +88,7 @@ public class UXToolkit {
                             positiveButtonLabel
                             , (dialog, which) -> {
                                 if(callback != null)
-                                    callback.onOK();
+                                    callback.onOK(dialog, which);
                             }
                     )
                     .create();
@@ -99,8 +99,8 @@ public class UXToolkit {
                     .setPositiveButton(
                             positiveButtonLabel
                             , (dialog, which) -> {
-                                if (callback != null)
-                                    callback.onOK();
+                                if(callback != null)
+                                    callback.onOK(dialog, which);
                             }
                     )
                     .create();
@@ -108,52 +108,80 @@ public class UXToolkit {
         return alertDialog;
     }
 
-    public void showAlertDialogue(String title, String message, String positiveButtonLabel, @Nullable UXEventListeners.AlertDialogueEventListener event){
-        StaticUtils.getHandler().post(()->{
+    public AlertDialog buildConfirmDialogue(String title, String message, @Nullable String positiveBtnLabel, @Nullable String negativeBtnLabel, UXEventListeners.ConfirmDialogueEventsListener events) {
+        if (positiveBtnLabel == null)
+            positiveBtnLabel = context.getResources().getString(R.string.label_btn_ok);
+        if (negativeBtnLabel == null)
+            negativeBtnLabel = "Cancel";
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
             try {
-                buildAlertDialogue(title, message, positiveButtonLabel, event).show();
-            } catch (Exception e){
                 Spanned htm = Html.fromHtml(message);
-                showToast(htm);
-
-                if(event != null)
-                    event.onOK();
-
+                return getDialogBuilder()
+                        .setTitle(title)
+                        .setMessage(htm)
+                        .setCancelable(false)
+                        .setPositiveButton(positiveBtnLabel, events::onOK)
+                        .setNegativeButton(negativeBtnLabel, events::onCancel)
+                        .create();
+            } catch (Exception e) {
                 ExceptionReporter.handle(e);
             }
-        });
+        } else {
+            try {
+                return getDialogBuilder()
+                        .setView(inflateInfoAlertDialogue(title, message))
+                        .setCancelable(false)
+                        .setPositiveButton(
+                                positiveBtnLabel
+                                , events::onOK)
+                        .setNegativeButton(
+                                negativeBtnLabel
+                                , events::onCancel)
+                        .create();
+            } catch (Exception e) {
+                ExceptionReporter.handle(e);
+            }
+        }
+        return null;
     }
 
-    public void showAlertDialogue(String title, String message, @Nullable UXEventListeners.AlertDialogueEventListener event){
-        showAlertDialogue(title, message, null, event);
+    public AlertDialog showAlertDialogue(String title, String message, String positiveButtonLabel, @Nullable UXEventListeners.AlertDialogueEventListener event){
+        AlertDialog dialog = buildAlertDialogue(title, message, positiveButtonLabel, event);
+        dialog.show();
+        return dialog;
     }
 
-    public void showAlertDialogue(int title, int message, UXEventListeners.AlertDialogueEventListener event){
-        showAlertDialogue(context.getString(title), context.getString(message), event);
+    public AlertDialog showAlertDialogue(String title, String message, @Nullable UXEventListeners.AlertDialogueEventListener event){
+        return showAlertDialogue(title, message, null, event);
     }
 
-    public void showAlertDialogue(String title, String message){
-        showAlertDialogue(title,message,null);
+    public AlertDialog showAlertDialogue(int title, int message, UXEventListeners.AlertDialogueEventListener event){
+        return showAlertDialogue(context.getString(title), context.getString(message), event);
     }
 
-    public void showAlertDialogue(int title, int message){
-        showAlertDialogue(context.getString(title), context.getString(message), null);
+    public AlertDialog showAlertDialogue(String title, String message){
+        return showAlertDialogue(title,message,null);
     }
 
-    public void showAlertDialogue(String message, UXEventListeners.AlertDialogueEventListener event){
-        showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), message, event);
+    public AlertDialog showAlertDialogue(int title, int message){
+        return showAlertDialogue(context.getString(title), context.getString(message), null);
     }
 
-    public void showAlertDialogue(int message, UXEventListeners.AlertDialogueEventListener event){
-        showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), context.getString(message), event);
+    public AlertDialog showAlertDialogue(String message, UXEventListeners.AlertDialogueEventListener event){
+        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), message, event);
     }
 
-    public void showAlertDialogue(String message){
-        showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), message, null);
+    public AlertDialog showAlertDialogue(int message, UXEventListeners.AlertDialogueEventListener event){
+        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), context.getString(message), event);
     }
 
-    public void showAlertDialogue(int message){
-        showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), context.getString(message), null);
+    public AlertDialog showAlertDialogue(String message){
+        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), message, null);
+    }
+
+    public AlertDialog showAlertDialogue(int message){
+        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), context.getString(message), null);
     }
 
     public AlertDialog showConfirmDialogue(String title, String message, String positiveBtnLabel, String negativeBtnLabel, UXEventListeners.ConfirmDialogueEventsListener events){
@@ -164,12 +192,42 @@ public class UXToolkit {
                         .setTitle(title)
                         .setMessage(htm)
                         .setCancelable(false)
-                        .setPositiveButton(positiveBtnLabel, (dialog1, which) -> {
-                            events.onOK();
-                        })
-                        .setNegativeButton(negativeBtnLabel, (dialog12, which) -> {
-                            events.onCancel();
-                        })
+                        .setPositiveButton(positiveBtnLabel, events::onOK)
+                        .setNegativeButton(negativeBtnLabel, events::onCancel)
+                        .create();
+
+                dialog.show();
+                return dialog;
+            } catch (Exception e){
+                ExceptionReporter.handle(e);
+            }
+        } else {
+            try {
+                AlertDialog alert = getDialogBuilder()
+                        .setView(inflateInfoAlertDialogue(title, message))
+                        .setCancelable(false)
+                        .setPositiveButton(positiveBtnLabel, events::onOK)
+                        .setNegativeButton(negativeBtnLabel, events::onCancel)
+                        .create();
+                alert.show();
+                return alert;
+            } catch (Exception e) {
+                ExceptionReporter.handle(e);
+            }
+        }
+        return null;
+    }
+
+    public AlertDialog showConfirmDialogue(String title, String message, UXEventListeners.ConfirmDialogueEventsListener events){
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
+            try {
+                Spanned htm = Html.fromHtml(message);
+                AlertDialog dialog = getDialogBuilder()
+                        .setTitle(title)
+                        .setMessage(htm)
+                        .setCancelable(false)
+                        .setPositiveButton(R.string.label_btn_ok, events::onOK)
+                        .setNegativeButton(R.string.label_btn_cancel, events::onCancel)
                         .create();
 
                 dialog.show();
@@ -183,16 +241,16 @@ public class UXToolkit {
                         .setView(inflateInfoAlertDialogue(title, message))
                         .setCancelable(false)
                         .setPositiveButton(
-                                positiveBtnLabel
-                                , (dialog, which) -> events.onOK())
+                                R.string.label_btn_ok
+                                , events::onOK)
                         .setNegativeButton(
-                                negativeBtnLabel
-                                , (dialog, which) -> events.onCancel())
+                                context
+                                        .getResources()
+                                        .getString(R.string.label_btn_cancel)
+                                , events::onCancel)
                         .create();
                 alert.show();
                 return alert;
-            } catch (WindowManager.BadTokenException e) {
-                ExceptionReporter.handle(e);
             } catch (Exception e) {
                 ExceptionReporter.handle(e);
             }
@@ -200,74 +258,27 @@ public class UXToolkit {
         return null;
     }
 
-    public boolean showConfirmDialogue(String title, String message, UXEventListeners.ConfirmDialogueEventsListener events){
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
-            try {
-                Spanned htm = Html.fromHtml(message);
-                AlertDialog dialog = getDialogBuilder()
-                        .setTitle(title)
-                        .setMessage(htm)
-                        .setCancelable(false)
-                        .setPositiveButton(R.string.label_btn_ok, (dialog1, which) -> {
-                            events.onOK();
-                        })
-                        .setNegativeButton(R.string.label_btn_cancel, (dialog12, which) -> {
-                            events.onCancel();
-                        })
-                        .create();
-
-                dialog.show();
-                return true;
-            } catch (Exception e){
-                ExceptionReporter.handle(e);
-                return false;
-            }
-        } else {
-            try {
-                AlertDialog alert = getDialogBuilder()
-                        .setView(inflateInfoAlertDialogue(title, message))
-                        .setCancelable(false)
-                        .setPositiveButton(
-                                R.string.label_btn_ok
-                                , (dialog, which) -> events.onOK())
-                        .setNegativeButton(
-                                context
-                                        .getResources()
-                                        .getString(R.string.label_btn_cancel)
-                                , (dialog, which) -> events.onCancel())
-                        .create();
-                alert.show();
-                return true;
-            } catch (WindowManager.BadTokenException e) {
-                ExceptionReporter.handle(e);
-                return false;
-            } catch (Exception e) {
-                ExceptionReporter.handle(e);
-                return false;
-            }
-        }
-    }
-
-    public boolean showConfirmDialogue(String message, UXEventListeners.ConfirmDialogueEventsListener events){
+    public AlertDialog showConfirmDialogue(String message, UXEventListeners.ConfirmDialogueEventsListener events){
         return showConfirmDialogue(context.getString(R.string.title_default_confirm_dialogue),message,events);
     }
 
-    public boolean showConfirmDialogue(int message, UXEventListeners.ConfirmDialogueEventsListener events){
+    public AlertDialog showConfirmDialogue(int message, UXEventListeners.ConfirmDialogueEventsListener events){
         return showConfirmDialogue(context.getString(R.string.title_default_confirm_dialogue),context.getString(message),events);
     }
 
-    public boolean showConfirmDialogue(int title, int message, UXEventListeners.ConfirmDialogueEventsListener events){
+    public AlertDialog showConfirmDialogue(int title, int message, UXEventListeners.ConfirmDialogueEventsListener events){
         return showConfirmDialogue(context.getString(title),context.getString(message),events);
     }
 
-    public void changeProgressDialogueMessage(String message){
+    public ProgressDialog changeProgressDialogueMessage(String message){
         synchronized (this) {
             if (progressDialog != null)
                 progressDialog.setMessage(message);
         }
+        return progressDialog;
     }
 
-    public void showProgressDialogue(String message, boolean cancelable){
+    public ProgressDialog showProgressDialogue(String message, boolean cancelable){
         synchronized (this) {
             if (progressDialog == null) {
                 progressDialog = new ProgressDialog(context);
@@ -276,18 +287,19 @@ public class UXToolkit {
                 changeProgressDialogueMessage(message);
             showProgressDialogue(cancelable);
         }
+        return progressDialog;
     }
 
-    public void showProgressDialogue(String message){
-        showProgressDialogue(message, false);
+    public ProgressDialog showProgressDialogue(String message){
+        return showProgressDialogue(message, false);
     }
 
-    public void showProgressDialogue(int stringResource, boolean cancelable){
-        showProgressDialogue(context.getResources().getString(stringResource), cancelable);
+    public ProgressDialog showProgressDialogue(int stringResource, boolean cancelable){
+        return showProgressDialogue(context.getResources().getString(stringResource), cancelable);
     }
 
-    public void showProgressDialogue(int stringResource){
-        showProgressDialogue(stringResource, false);
+    public ProgressDialog showProgressDialogue(int stringResource){
+        return showProgressDialogue(stringResource, false);
     }
 
     public void dismissProgressDialogue(){
@@ -300,15 +312,16 @@ public class UXToolkit {
         }
     }
 
-    public void showProgressDialogue(){
-        showProgressDialogue(false);
+    public ProgressDialog showProgressDialogue(){
+        return showProgressDialogue(false);
     }
 
-    private void showProgressDialogue(boolean cancelable){
+    private ProgressDialog showProgressDialogue(boolean cancelable){
         if(!progressDialog.isShowing()) {
             progressDialog.setCancelable(cancelable);
             progressDialog.show();
         }
+        return progressDialog;
     }
 
     public void showToast(String message){

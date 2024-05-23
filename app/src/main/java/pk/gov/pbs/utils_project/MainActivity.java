@@ -1,18 +1,17 @@
 package pk.gov.pbs.utils_project;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import pk.gov.pbs.utils.CustomActivity;
-import pk.gov.pbs.utils.FileManager;
 
 public class MainActivity extends CustomActivity {
-    FileManager mFileManager;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -23,7 +22,14 @@ public class MainActivity extends CustomActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-        checkAllPermissions();
-        mFileManager = new FileManager(this);
+
+        ((TextView) findViewById(R.id.tvApiLevel)).setText(Utils.getDeviceOS());
+        findViewById(R.id.btnPermissions).setOnClickListener(v -> {
+            startActivity(new Intent(this, PermissionActivity.class));
+        });
+
+        findViewById(R.id.btnFileManager).setOnClickListener(v -> {
+            startActivity(new Intent(this, FileManagerActivity.class));
+        });
     }
 }

@@ -26,12 +26,8 @@ import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 
 public class FileManager {
-    private final String TAG = "FileUtils";
+    private final String TAG = "FileManager";
     private static final int REQUEST_EXTERNAL_STORAGE_CODE = 20;
-    private static final String[] PERMISSIONS_REQUIRED = {
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-    };
     protected Context mContext;
 
     public FileManager(Context context){
@@ -39,13 +35,25 @@ public class FileManager {
     }
 
     public static String[] getPermissionsRequired(){
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            String[] permissions = new String[PERMISSIONS_REQUIRED.length + 1];
-            System.arraycopy(PERMISSIONS_REQUIRED, 0, permissions, 0, PERMISSIONS_REQUIRED.length);
-            permissions[PERMISSIONS_REQUIRED.length] = Manifest.permission.MANAGE_EXTERNAL_STORAGE;
-            return permissions;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            return new String[]{
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_AUDIO,
+                    Manifest.permission.READ_MEDIA_VIDEO
+            };
         }
-        return PERMISSIONS_REQUIRED;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return new String[]{
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.MANAGE_EXTERNAL_STORAGE
+            };
+        }
+
+        return new String[]{
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+        };
     }
 
     /**
@@ -56,11 +64,14 @@ public class FileManager {
      * that one or more permissions regarding storage are not granted
      */
     public static boolean hasPermissions(Context context) {
-        boolean has = true;
-        for (String perm : getPermissionsRequired())
-            has = has & ActivityCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+            return Environment.isExternalStorageManager();
+        }else {
+            int write = ActivityCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            int read = ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE);
 
-        return has && (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager());
+            return read == PackageManager.PERMISSION_GRANTED && write == PackageManager.PERMISSION_GRANTED;
+        }
     }
 
     /**
@@ -68,6 +79,12 @@ public class FileManager {
      * For API >= 30 it opens up the activity to allow current app the permission to manage all files
      */
     public static void requestPermissions(Activity context){
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R){
+            if (!hasPermissions(context)) {
+                requestForFileManagerPermission(context);
+            }
+        }
+
         if (!hasPermissions(context)) {
             ActivityCompat.requestPermissions(
                     context,
@@ -75,10 +92,19 @@ public class FileManager {
                     REQUEST_EXTERNAL_STORAGE_CODE
             );
         }
+    }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            requestForFileManagerPermission(context);
+    /**
+     * For API >= 30 and API < 33 this method checks if current app has permission to manage all files
+     * for other API return true by default because api < 30 don't need it
+     * and API >= 33 it already has it
+     * @return true if app has permission to manage all files, false otherwise
+     */
+    public static boolean hasFileManagerPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU) {
+            return Environment.isExternalStorageManager();
         }
+        return true;
     }
 
     /**
@@ -89,9 +115,7 @@ public class FileManager {
     @RequiresApi(api = Build.VERSION_CODES.R)
     public static void requestForFileManagerPermission(Context context){
         StaticUtils.getHandler().post(()->{
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-                Toast.makeText(context, "On API 30 and above permission to manage all files is required, Please enable the option of \'Allow access to manage all files\'.", Toast.LENGTH_SHORT).show();
-            }
+            Toast.makeText(context, "On API 30 and above permission to manage all files is required, Please enable the option of \'Allow access to manage all files\'.", Toast.LENGTH_SHORT).show();
         });
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()){
@@ -101,112 +125,135 @@ public class FileManager {
             context.startActivity(intent);
         }
     }
-    /**
-     * @param mode :
-     *          Context.MODE_APPEND     --> write more to exist file.
-     *          Context.MODE_PRIVATE    --> only available within app.
-     *          FileProvider with the FLAG_GRANT_READ_URI_PERMISSION    --> share file.
-     * */
-    public void writeFileInternal(int mode, String fileName, String data) {
 
+    /**
+     * Write file into internal cache storage of the app, it is not accessible via FileExplorer apps unless
+     * your device is rooted
+     * */
+    public boolean writeFileInternalCache(String fileName, String data, int mode) {
         try {
 
-            // 2 lines of these are the same with one line below.
-            // Notice:
-            //      + Instead using getFilesDir(), you can use getCacheDir() to get directory
-            // of cache place in internal storage.
-            //      + openFileOutput will create in app private storage, not in cache.
-
-            //File file = new File(context.getFilesDir(), fileName);
-            //FileOutputStream fos = new FileOutputStream(file);
-
-            FileOutputStream fos = mContext.openFileOutput(fileName, mode);
-
-            // Instantiate a stream writer.
+            FileOutputStream fos = new FileOutputStream(new File(mContext.getCacheDir(), fileName));
             OutputStreamWriter out = new OutputStreamWriter(fos);
 
-            // Add data.
             if(mode == Context.MODE_APPEND) {
                 out.append(data).append("\n");
             }else {
                 out.write(data);
             }
-
-            // Close stream writer.
             out.close();
-
+            return true;
         } catch (Exception e) {
-            e.printStackTrace();
+            ExceptionReporter.handle(e);
         }
+        return false;
     }
 
-    public String readFileInternal(String fileName) {
+    public String readFileInternalCache(String fileName) {
 
         try {
-
-            // 2 lines of these are the same with one line below.
-            // Notice:
-            //      + Instead using getFilesDir(), you can use getCacheDir() to get directory
-            // of cache place in internal storage.
-            //      + openFileInput will open a file in app private storage, not in cache.
-
-//            File file = new File(context.getFilesDir(), fileName);
-//            FileInputStream fis = new FileInputStream(file);
-
-            FileInputStream fis = mContext.openFileInput(fileName);
-
-            // Instantiate a buffer reader. (Buffer )
+            FileInputStream fis = new FileInputStream(
+                    new File(mContext.getCacheDir(), fileName)
+            );
             BufferedReader bufferedReader = new BufferedReader(
                     new InputStreamReader(fis));
 
             String s;
             StringBuilder fileContentStrBuilder = new StringBuilder();
 
-            // Read every lines in file.
             while ((s = bufferedReader.readLine()) != null) {
                 fileContentStrBuilder.append(s);
             }
-
-            // Close buffer reader.
             bufferedReader.close();
 
             return fileContentStrBuilder.toString();
 
         } catch (IOException e) {
-            e.printStackTrace();
+            ExceptionReporter.handle(e);
+            return null;
+        }
+    }
 
+    public boolean deleteFileInternalCache(String fileName){
+        File file = new File(mContext.getCacheDir(), fileName);
+        if (file.exists())
+            return file.delete();
+        return true;
+    }
+
+
+    /**
+     * Write file into internal storage of the app, it is not accessible via FileExplorer apps unless
+     * your device is rooted
+     * @param mode :
+     *          Context.MODE_APPEND     --> write more to exist file.
+     *          Context.MODE_PRIVATE    --> only available within app.
+     *          FileProvider with the FLAG_GRANT_READ_URI_PERMISSION  --> for share file.
+     * */
+    public boolean writeFileInternal(String fileName, String data, int mode) {
+        try {
+            FileOutputStream fos = mContext.openFileOutput(fileName, mode);
+            OutputStreamWriter out = new OutputStreamWriter(fos);
+
+            if(mode == Context.MODE_APPEND) {
+                out.append(data).append("\n");
+            }else {
+                out.write(data);
+            }
+            out.close();
+            return true;
+        } catch (Exception e) {
+            ExceptionReporter.handle(e);
+            return false;
+        }
+    }
+
+    public String readFileInternal(String fileName) {
+
+        try {
+            FileInputStream fis = mContext.openFileInput(fileName);
+            BufferedReader bufferedReader = new BufferedReader(
+                    new InputStreamReader(fis));
+
+            String s;
+            StringBuilder fileContentStrBuilder = new StringBuilder();
+
+            while ((s = bufferedReader.readLine()) != null) {
+                fileContentStrBuilder.append(s);
+            }
+            bufferedReader.close();
+
+            return fileContentStrBuilder.toString();
+
+        } catch (IOException e) {
+            ExceptionReporter.handle(e);
             return null;
         }
     }
 
     public boolean deleteFileInternal(String fileName){
-        // If the file is saved on internal storage, you can also ask the Context to locate and delete a file by calling deleteFile()
         return mContext.deleteFile(fileName);
     }
 
     /* ******************************************************************************************** *
      *                                                                                              *
-     *  - If your app uses the WRITE_EXTERNAL_STORAGE permission, then it implicitly has permission *
-     *  to read the external storage as well.                                                       *
-     *  - Must declare READ_EXTERNAL_STORAGE or WRITE_EXTERNAL_STORAGE before manipulate with       *
-     *  external storage.                                                                           *
      *  - Handle file in private external storage in low api (below 18), don't require permission.  *
      *  - Don't be confused external storage with SD external card, since internal SD card is       *
      *  considered as external storage. And internal SD card is a default external storage.         *
      *                                                                                              *
      * ******************************************************************************************** */
 
-    // Checks if external storage is available for read and write.
-    public boolean isExternalStorageWritable() {
-        String state = Environment.getExternalStorageState();
-        return Environment.MEDIA_MOUNTED.equals(state);
-    }
-
     // Checks if external storage is available to at least read.
     public boolean isExternalStorageReadable() {
         String state = Environment.getExternalStorageState();
         return Environment.MEDIA_MOUNTED.equals(state) ||
                 Environment.MEDIA_MOUNTED_READ_ONLY.equals(state);
+    }
+
+    // Checks if external storage is available for read and write.
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        return Environment.MEDIA_MOUNTED.equals(state);
     }
 
     public boolean isExternalStorageAvailable(){
@@ -222,15 +269,15 @@ public class FileManager {
      *  @param subFolder: usually an app name to distinguish with another app.
      *  @param fileName: ".nomedia" + fileName to hide it from MediaStore scanning.
      */
-    public void writeFileExternalPublic(String mainDir, String subFolder, int mode, String fileName, String data){
+    public boolean writeFileExternalPublic(String mainDir, String subFolder, String fileName, String data, int mode){
 
-        if(!isExternalStorageAvailable()){
-            Log.e(TAG, "External storage is not available.");
-            return;
+        if(!hasPermissions(mContext) || !isExternalStorageAvailable()){
+            ExceptionReporter.handle(new IOException("Either app do not have storage permissions, or external storage is not available"));
+            return false;
         }
 
         // Get the directory for the user's public mainDir directory.
-        String directory = getExternalPublicDirectory(mainDir, subFolder);
+        String directory = getPathDirectoryExternalPublic(mainDir, subFolder);
         File folder = new File(directory);
 
         // If directory doesn't exist, create it.
@@ -239,12 +286,10 @@ public class FileManager {
         }
 
         File file = new File(folder, fileName);
-
-        Log.d(TAG, "File directory: " + file.getAbsolutePath());
         try {
             if (!file.exists()){
                 if(!file.createNewFile())
-                    throw new IOException("Failed to create new file.");
+                    throw new IOException("Failed to create new file. " + file.getAbsolutePath());
             }
 
             FileOutputStream fos;
@@ -263,38 +308,26 @@ public class FileManager {
             }else {
                 out.write(data);
             }
-
-            // Close stream writer.
             out.close();
-
+            return true;
         } catch (IOException e) {
-            e.printStackTrace();
+            ExceptionReporter.handle(e);
+            return false;
         }
-    }
-
-    public String getExternalPublicDirectory(String mainDir, String subFolder){
-        File root;
-        if(mainDir.isEmpty()){
-            root = Environment.getExternalStorageDirectory();
-        }else {
-            root = Environment.getExternalStoragePublicDirectory(mainDir);
-        }
-
-        return root + File.separator  + subFolder;
     }
 
     public String readFileExternalPublic(String mainDir, String subFolder, String fileName) {
 
         try {
 
-            String directory = getExternalPublicDirectory(mainDir, subFolder);
+            String directory = getPathDirectoryExternalPublic(mainDir, subFolder);
             File folder = new File(directory);
 
             File file = new File(folder, fileName);
 
             // If file doesn't exist.
             if (!file.exists()) {
-                Log.e(TAG, "File doesn't exist.");
+                ExceptionReporter.handle(new IOException("file does not exists " + mainDir + "/" + subFolder + "/" + fileName));
                 return null;
             }
 
@@ -318,22 +351,21 @@ public class FileManager {
             return fileContentStrBuilder.toString();
 
         } catch (IOException e) {
-            e.printStackTrace();
-
+            ExceptionReporter.handle(e);
             return null;
         }
     }
 
     public boolean deleteFileExternalPublic(String mainDir, String subFolder, String fileName){
 
-        String directory = getExternalPublicDirectory(mainDir, subFolder);
+        String directory = getPathDirectoryExternalPublic(mainDir, subFolder);
         File folder = new File(directory);
 
         File file = new File(folder, fileName);
 
         // If file doesn't exist.
         if (!file.exists()) {
-            Log.e(TAG, "File doesn't exist.");
+            ExceptionReporter.handle(new IOException("specified file to be delete does not exists " + mainDir + "/" + subFolder + "/" + fileName));
             return true;
         }
         return file.delete();
@@ -348,63 +380,44 @@ public class FileManager {
      *                  - It can be null --> represent that directory as a parent file of private external storage in the app.
      *  @param subFolder: usually an app name to distinguish with another app.
      */
-    public void writeFileExternalPrivate(String mainDir, String subFolder, int mode, String fileName, String data){
-
+    public boolean writeFileExternalPrivate(String mainDir, String subFolder, String fileName, String data, int mode){
         // Get the directory for the user's private mainDir directory.
         String directory = mContext.getExternalFilesDir(mainDir) + File.separator  + subFolder;
         File folder = new File(directory);
 
         // If directory doesn't exist, create it.
         if (!folder.exists()) {
-            folder.mkdirs();
+            if(!folder.mkdirs())
+                ExceptionReporter.handle(new IOException("Failed to create new directory. " + directory));
         }
 
         File file = new File(folder, fileName);
 
         try {
             FileOutputStream fos;
-//            if(mode == Context.MODE_APPEND) {
-//                fos = new FileOutputStream(file, true);
-//            }else {
-//                fos = new FileOutputStream(file);
-//            }
-
             fos = new FileOutputStream(file);
-
-            // Instantiate a stream writer.
             OutputStreamWriter out = new OutputStreamWriter(fos);
-
-            // Add data.
             if(mode == Context.MODE_APPEND) {
                 out.append(data + "\n");
             }else {
                 out.write(data);
             }
-
-            // Close stream writer.
             out.close();
-
+            return true;
         } catch (IOException e) {
-            e.printStackTrace();
+            ExceptionReporter.handle(e);
+            return false;
         }
     }
 
-    public String getDirectoryExternalPrivate(String mainDir, String subFolder){
-        return mContext.getExternalFilesDir(mainDir) + File.separator  + subFolder;
-    }
-
     public String readFileExternalPrivate(String mainDir, String subFolder, String fileName) {
-
         try {
-
-            String directory = getDirectoryExternalPrivate(mainDir, subFolder);
+            String directory = buildPathExternalPrivate(mainDir, subFolder);
             File folder = new File(directory);
 
             File file = new File(folder, fileName);
-
-            // If file doesn't exist.
             if (!file.exists()) {
-                Log.e(TAG, "File doesn't exist.");
+                ExceptionReporter.handle(new IOException("file does not exists '" + mainDir + "/" + subFolder + "/" + fileName + "'"));
                 return null;
             }
 
@@ -428,22 +441,19 @@ public class FileManager {
             return fileContentStrBuilder.toString();
 
         } catch (IOException e) {
-            e.printStackTrace();
-
+            ExceptionReporter.handle(e);
             return null;
         }
     }
 
     public boolean deleteFileExternalPrivate(String mainDir, String subFolder, String fileName){
 
-        String directory = getDirectoryExternalPrivate(mainDir, subFolder);
+        String directory = buildPathExternalPrivate(mainDir, subFolder);
         File folder = new File(directory);
 
         File file = new File(folder, fileName);
-
-        // If file doesn't exist.
         if (!file.exists()) {
-            Log.e(TAG, "File doesn't exist.");
+            ExceptionReporter.handle(new IOException("Failed to delete file '" + mainDir + "/" + subFolder + "/" + fileName +"'"));
             return true;
         }
         return file.delete();
@@ -475,26 +485,7 @@ public class FileManager {
 
 
     /**********************************************************************************************/
-
-    public File getExternalPublicDirectory(String... args){
-        try {
-            String path = buildPathPublicDirectory(args);
-            if (path == null)
-                return null;
-
-            File dir = Environment.getExternalStoragePublicDirectory(path);
-
-            if (!dir.exists())
-                return dir.mkdirs() ? dir : null;
-
-            return dir;
-        }catch (Exception e){
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private String buildPathPublicDirectory(String... args){
+    private String buildPath(String... args){
         if (args != null && args.length > 0){
             StringBuilder sb = new StringBuilder();
             sb.append(args[0]);
@@ -506,56 +497,116 @@ public class FileManager {
         return null;
     }
 
-    public boolean writeFile(@NonNull File destDirectory, String fileName, String data){
-        try{
-            if(destDirectory.exists()) {
-                File file = new File(destDirectory, fileName);
-
-                FileOutputStream fos = new FileOutputStream(file);
-                OutputStreamWriter out = new OutputStreamWriter(fos);
-
-                out.write(data);
-                out.close();
-                return true;
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
+    public String getPathRootExternalPublic(){
+        return  Environment.getExternalStorageDirectory().getAbsolutePath();
     }
 
-    public String readFile(File directory, String fileName){
-        try {
-            // Create file.
-            File file = new File(directory, fileName);
-            return readFile(file);
+    public String getPathDirectoryExternalPublic(String mainDir, String subFolder){
+        File root;
+        if(mainDir.isEmpty()){
+            root = Environment.getExternalStorageDirectory();
+        }else {
+            root = Environment.getExternalStoragePublicDirectory(mainDir);
+        }
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        return root + File.separator  + subFolder;
+    }
+
+    public String buildPathExternalPrivate(String mainDir, String subFolder){
+        return mContext.getExternalFilesDir(mainDir) + File.separator  + subFolder;
+    }
+
+    public File getDirectoryExternalPublic(String... dirPath){
+        if (dirPath == null || dirPath[0] == null)
+            ExceptionReporter.handle(new IllegalArgumentException("file path / address not provided"));
+
+        try {
+            String path = buildPath(dirPath);
+            if (path == null)
+                return null;
+
+            File file = Environment.getExternalStoragePublicDirectory(path);
+
+            if (!file.exists())
+                return file.mkdirs() ? file : null;
+
+            return file;
+        }catch (Exception e){
+            ExceptionReporter.handle(e);
             return null;
         }
     }
 
-    public String readFile(File file) throws IOException{
-        FileInputStream fis = new FileInputStream(file);
-
-        // Instantiate a buffer reader. (Buffer )
-        BufferedReader bufferedReader = new BufferedReader(
-                new InputStreamReader(fis));
-
-        String s;
-        StringBuilder fileContentStrBuilder = new StringBuilder();
-
-        // Read every lines in file.
-        while ((s = bufferedReader.readLine()) != null) {
-            fileContentStrBuilder.append(s);
+    public File getFileExternalPublic(String... filePath){
+        if (filePath == null || filePath[0] == null) {
+            ExceptionReporter.handle(new IllegalArgumentException("file address not provided"));
+            return null;
         }
 
-        // Close buffer reader.
-        bufferedReader.close();
+        try {
+            File file = null;
+            if (filePath.length > 1) {
+                String fileName = filePath[filePath.length - 1];
+                String[] path = new String[filePath.length-1];
+                System.arraycopy(filePath,0, path, 0, filePath.length-1);
+                File dir = getDirectoryExternalPublic(path);
+                file = new File(dir, fileName);
+            } else {
+                file = new File(getPathRootExternalPublic() + File.separator + filePath[0]);
+            }
 
-        return fileContentStrBuilder.toString();
+            return file;
+        }catch (Exception e){
+            ExceptionReporter.handle(e);
+            return null;
+        }
+    }
+
+    public boolean writeFile(File file, String data, int mode){
+        try {
+            FileOutputStream fos = (mode == Context.MODE_APPEND) ?
+                    new FileOutputStream(file, true) :
+                    new FileOutputStream(file);
+            OutputStreamWriter out = new OutputStreamWriter(fos);
+
+            if (mode == Context.MODE_APPEND) {
+                out.append(data).append("\n");
+            } else {
+                out.write(data);
+            }
+
+            out.close();
+            return true;
+        } catch (Exception e){
+            ExceptionReporter.handle(e);
+            return false;
+        }
+    }
+
+    public String readFile(File file) {
+        try {
+            FileInputStream fis = new FileInputStream(file);
+
+            // Instantiate a buffer reader. (Buffer )
+            BufferedReader bufferedReader = new BufferedReader(
+                    new InputStreamReader(fis));
+
+            String s;
+            StringBuilder fileContentStrBuilder = new StringBuilder();
+
+            // Read every lines in file.
+            while ((s = bufferedReader.readLine()) != null) {
+                fileContentStrBuilder.append(s);
+            }
+
+            // Close buffer reader.
+            bufferedReader.close();
+
+            return fileContentStrBuilder.toString();
+        } catch (Exception e){
+            ExceptionReporter.handle(e);
+            return null;
+        }
     }
 
     public boolean deleteFile(@NonNull File file){

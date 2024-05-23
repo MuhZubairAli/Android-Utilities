@@ -2,6 +2,7 @@ package pk.gov.pbs.utils;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.Looper;
 
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
@@ -13,7 +14,7 @@ public class StaticUtils {
     public static Handler getHandler(){
         synchronized (StaticUtils.class){
             if (handler == null)
-                handler= new Handler();
+                handler= new Handler(Looper.getMainLooper());
             return handler;
         }
     }

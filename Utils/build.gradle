@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    id 'maven-publish'
 }
 
 android {
@@ -8,7 +7,7 @@ android {
     compileSdk 34
 
     defaultConfig {
-        minSdk 23
+        minSdk 21
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -26,31 +25,14 @@ android {
     }
 }
 
-publishing {
-    publications {
-        bar(MavenPublication) {
-            groupId "com.github.muhzubairali"
-            artifactId "utils"
-            version "1.0.0"
-            artifact("$buildDir/outputs/aar/Utils-release.aar")
-        }
-    }
-
-    repositories {
-        maven {
-            name "GithubPackages"
-            url uri("https://maven.pkg.github.com/MuhZubairAli/Android-Utilities")
-            credentials {
-                username System.getenv("GITHUB_USER")
-                password System.getenv("GITHUB_USER_TOKEN")
-            }
-        }
-    }
-}
-
 dependencies {
     implementation libs.appcompat
     implementation libs.gson
     implementation libs.volley
     implementation libs.annotations
+
+    implementation libs.appcompat
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
 }

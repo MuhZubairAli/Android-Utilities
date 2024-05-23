@@ -1,12 +1,11 @@
 package pk.gov.pbs.utils;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
@@ -25,8 +24,9 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Stack;
 
 import pk.gov.pbs.utils.exceptions.InvalidIndexException;
 import pk.gov.pbs.utils.location.ILocationChangeCallback;
@@ -45,8 +46,6 @@ import pk.gov.pbs.utils.location.LocationService;
 
 public abstract class CustomActivity extends AppCompatActivity {
     private static final String TAG = ":Utils] CustomActivity";
-    private static final int PERMISSIONS_REQUEST_FIRST = 100;
-    private static final int PERMISSIONS_REQUEST_SECOND = 101;
     private static final int mSystemControlsHideFlags =
             View.SYSTEM_UI_FLAG_LOW_PROFILE
                     | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -59,6 +58,8 @@ public abstract class CustomActivity extends AppCompatActivity {
     private boolean USING_LOCATION_SERVICE = false;
     private ActionBar actionBar;
     private AlertDialog dialogLocationSettings;
+    private AlertDialog dialogStorageManagerPermission;
+    private AlertDialog dialogAppSettings;
 
     private Runnable mAfterLocationServiceStartCallback;
     private LocationService mLocationService = null;
@@ -67,7 +68,9 @@ public abstract class CustomActivity extends AppCompatActivity {
     private static byte mLocationAttachAttempts = 0;
 
     private final List<String> mPermissions = new ArrayList<>();
-    private final List<String> mSpecialPermissions = new ArrayList<>(5);
+    private final List<String> mSpecialPermissions = new ArrayList<>(2);
+    private final Stack<PermissionRequest> mSpecialPermissionRequests = new Stack<>();
+    private ActivityResultLauncher<String[]> requestPermissionLauncher;
 
     private LayoutInflater mLayoutInflater;
     protected UXToolkit mUXToolkit;
@@ -77,7 +80,6 @@ public abstract class CustomActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initialize();
-        //checkAllPermissions();
     }
 
     @Override
@@ -89,6 +91,9 @@ public abstract class CustomActivity extends AppCompatActivity {
                     showAlertLocationSettings();
             }
         }
+
+        if (!mSpecialPermissionRequests.isEmpty())
+            mSpecialPermissionRequests.pop().askPermission();
     }
 
     @Override
@@ -102,41 +107,61 @@ public abstract class CustomActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        List<String> askAgain = new ArrayList<>();
-        boolean missingPermission = false;
-        for (int i = 0; i < grantResults.length; i++) {
-            missingPermission = missingPermission | grantResults[i] == PackageManager.PERMISSION_DENIED;
-            if (grantResults[i] == PackageManager.PERMISSION_DENIED)
-                askAgain.add(permissions[i]);
-        }
-
-        if (requestCode == PERMISSIONS_REQUEST_FIRST && missingPermission) {
-            boolean showRationale = false;
-            for (String perm : askAgain)
-                showRationale = showRationale | ActivityCompat.shouldShowRequestPermissionRationale(this, perm);
-
-            if (showRationale) {
-                mUXToolkit.buildAlertDialogue(
-                        getString(R.string.alert_dialog_permission_require_all_title)
-                        , getString(R.string.alert_dialog_permission_require_all_message)
-                        , getString(R.string.label_btn_request_again),
-                        () -> requestPermissions(PERMISSIONS_REQUEST_SECOND, askAgain.toArray(new String[0]))).show();
-            } else {
-                // No explanation needed, we can request the permissions..
-                requestPermissions(PERMISSIONS_REQUEST_SECOND, askAgain.toArray(new String[0]));
-            }
-        } else if (requestCode == PERMISSIONS_REQUEST_SECOND && missingPermission) {
-            showAlertAppPermissionsSetting();
-        }
-
-        if (!mSpecialPermissions.isEmpty()){
-            requestSpecialPermissions();
-        }
-    }
+//    For android 11 and below, onRequestPermissionsResult() will be called
+//    protected void requestPermissions(int requestCode, String[] permissions){
+//        ActivityCompat.requestPermissions(
+//                this,
+//                permissions,
+//                requestCode
+//        );
+//    }
+//    @Override
+//    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+//        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+//
+//        List<String> askAgain = new ArrayList<>();
+//        boolean missingPermission = false;
+//        for (int i = 0; i < grantResults.length; i++) {
+//            missingPermission = missingPermission | grantResults[i] == PackageManager.PERMISSION_DENIED;
+//            if (grantResults[i] == PackageManager.PERMISSION_DENIED)
+//                askAgain.add(permissions[i]);
+//        }
+//
+//        if (requestCode == PERMISSIONS_REQUEST_FIRST && missingPermission) {
+//            boolean showRationale = false;
+//            for (String perm : askAgain)
+//                showRationale = showRationale | ActivityCompat.shouldShowRequestPermissionRationale(this, perm);
+//
+//            if (showRationale) {
+//                mUXToolkit.showConfirmDialogue(
+//                        getString(R.string.alert_dialog_permission_require_all_title)
+//                        , getString(R.string.alert_dialog_permission_require_all_message)
+//                        , getString(R.string.label_btn_request_again)
+//                        , "Cancel"
+//                        , new UXEventListeners.ConfirmDialogueEventsListener(){
+//
+//                            @Override
+//                            public void onOK(DialogInterface dialog, int which) {
+//                                requestPermissions(PERMISSIONS_REQUEST_SECOND, askAgain.toArray(new String[0]));
+//                            }
+//
+//                            @Override
+//                            public void onCancel(DialogInterface dialog, int which) {
+//                                dialog.dismiss();
+//                            }
+//                        });
+//            } else {
+//                // No explanation needed, we can request the permissions..
+//                requestPermissions(PERMISSIONS_REQUEST_SECOND, askAgain.toArray(new String[0]));
+//            }
+//        } else if (requestCode == PERMISSIONS_REQUEST_SECOND && missingPermission) {
+//            showAlertAppPermissionsSetting();
+//        }
+//
+//        if (!mSpecialPermissions.isEmpty()){
+//            requestSpecialPermissions();
+//        }
+//    }
 
     private void initialize(){
         mUXToolkit = new UXToolkit(this);
@@ -150,7 +175,6 @@ public abstract class CustomActivity extends AppCompatActivity {
         };
 
         mPermissions.addAll(Arrays.asList(
-                Manifest.permission.INTERNET,
                 Manifest.permission.ACCESS_NETWORK_STATE,
                 Manifest.permission.ACCESS_WIFI_STATE,
                 Manifest.permission.READ_PHONE_STATE)
@@ -163,9 +187,58 @@ public abstract class CustomActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             mSpecialPermissions.add(Manifest.permission.MANAGE_EXTERNAL_STORAGE);
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            mPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
+            mSpecialPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
+        }
+
+        requestPermissionLauncher =
+        registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
+                permissions -> {
+                    boolean showRationale = false;
+                    List<String> deniedPermission = new ArrayList<>();
+                    for (String perm : permissions.keySet()){
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            boolean show = shouldShowRequestPermissionRationale(perm);
+                            showRationale |= show;
+                        }
+
+                        if (Boolean.FALSE.equals(permissions.get(perm)))
+                            deniedPermission.add(perm);
+                    }
+
+                    if (!deniedPermission.isEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        if (showRationale) {
+                            mUXToolkit.showConfirmDialogue(
+                                "Permission Required"
+                                , "All requested permissions are required to work properly, Kindly grant all the requested permissions"
+                                , "Open Permissions Settings"
+                                , "Request Again"
+                                , new UXEventListeners.ConfirmDialogueEventsListener() {
+                                    @Override
+                                    public void onCancel(DialogInterface dialog, int which) {
+                                        requestPermissions(deniedPermission.toArray(new String[0]));
+                                    }
+
+                                    @Override
+                                    public void onOK(DialogInterface dialog, int which) {
+                                        openAppSettingsActivity();
+                                    }
+                                });
+                        } else {
+                            if (permissions.size() == 1 && permissions.containsKey(Manifest.permission.MANAGE_EXTERNAL_STORAGE))
+                                requestSpecialPermissions();
+                            else
+                                showAlertAppPermissionsSetting();
+                        }
+                    } else if (deniedPermission.isEmpty() && !permissions.isEmpty()) {
+                        requestSpecialPermissions();
+                    }
+                });
     }
 
-    private String[] getAllPermissions(){
+    protected String[] getAllPermissions(){
         String[] permissions = new String[
                 mPermissions.size() +
                 LocationService.getPermissionsRequired().length +
@@ -224,41 +297,52 @@ public abstract class CustomActivity extends AppCompatActivity {
     }
 
     protected void checkAllPermissions() {
-        if (getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.CREATED))
-            throw new RuntimeException("This method must be called from onCreate method only, other wise it will cause infinite recursion");
-
         String[] perms = getAskablePermissions();
         if (perms != null && perms.length > 0)
-            requestPermissions(
-                    CustomActivity.PERMISSIONS_REQUEST_FIRST,
-                    perms
-            );
+            requestPermissions(perms);
         else if (!hasAllPermissions())
             requestSpecialPermissions();
     }
 
-    protected void requestPermissions(int requestCode, String[] permissions){
-        ActivityCompat.requestPermissions(
-                this,
-                permissions,
-                requestCode
-        );
+    public void requestPermissions(String[] permissions){
+        requestPermissionLauncher.launch(permissions);
     }
 
     protected void requestSpecialPermissions(){
-        for (String perm : mSpecialPermissions){
+        for (String perm : getSpecialPermissions()){
             if (perm.equals(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-                    StaticUtils.getHandler().post(() -> {
-                        mUXToolkit.showToast("On API 30 and above permission to manage all files is required, Please enable the option of 'Allow access to manage all files'.");
-                    });
-                    Uri uri = Uri.parse("package:" + this.getPackageName());
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, uri);
-                    startActivity(intent);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU && !Environment.isExternalStorageManager()) {
+                    mSpecialPermissionRequests.push(
+                        new PermissionRequest(
+                            "In order to read and write files to external storage, Permission to manage all files is required, Please enable the option of 'Allow access to manage all files' on next screen."
+                            , ()-> {
+                                Uri uri = Uri.parse("package:" + CustomActivity.this.getPackageName());
+                                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, uri);
+                                startActivity(intent);
+                            }
+                        )
+                    );
                 }
+            } else if (perm.equals(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+                mSpecialPermissionRequests.push(
+                    new PermissionRequest(
+                        "This application requires background location to work properly, Please enable the option of 'Allow all the time' on Location Permissions screen."
+                        , ()->{
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION});
+                            }
+                        }
+                    )
+                );
             } else { // else if(other special permission) handle requesting of other special permission (if any)
+                throw new RuntimeException("Special permission ["+perm+"] is not has the implementation for requesting permission yet");
             }
+            mSpecialPermissions.remove(perm);
         }
+
+        // Initiating the loop of requesting special permissions, other permissions requests are handled in on onResume()
+        if (!mSpecialPermissionRequests.isEmpty())
+            mSpecialPermissionRequests.pop().askPermission();
     }
 
     //only call this from Activity construction
@@ -509,29 +593,43 @@ public abstract class CustomActivity extends AppCompatActivity {
         }
     }
 
+    private void openAppSettingsActivity() {
+        final Intent i = new Intent();
+        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        i.addCategory(Intent.CATEGORY_DEFAULT);
+        i.setData(Uri.parse("package:" + getPackageName()));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        startActivity(i);
+    }
+
     protected void showAlertAppPermissionsSetting(){
         try {
             if (!isDestroyed() && !isFinishing()) {
-                if(dialogLocationSettings == null) {
-                    dialogLocationSettings = mUXToolkit.buildAlertDialogue(
+                if(dialogAppSettings == null) {
+                    dialogAppSettings = mUXToolkit.buildConfirmDialogue(
                             getString(R.string.alert_dialog_all_permissions_title)
-                            ,getString(R.string.alert_dialog_all_permissions_message)
-                            ,getString(R.string.label_btn_permissions_settings)
-                            , () -> {
-                                final Intent i = new Intent();
-                                i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                                i.addCategory(Intent.CATEGORY_DEFAULT);
-                                i.setData(Uri.parse("package:" + getPackageName()));
-                                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                                i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-                                startActivity(i);
+                            , getString(R.string.alert_dialog_all_permissions_message)
+                            , getString(R.string.label_btn_permissions_settings)
+                            , "Cancel"
+                            , new UXEventListeners.ConfirmDialogueEventsListener() {
+                                @Override
+                                public void onCancel(DialogInterface dialog, int which) {
+                                    dialogAppSettings.dismiss();
+                                }
+
+                                @Override
+                                public void onOK(DialogInterface dialog, int which) {
+                                    openAppSettingsActivity();
+                                }
                             }
+
                     );
                 }
 
-                if(!dialogLocationSettings.isShowing())
-                    dialogLocationSettings.show();
+                if(!dialogAppSettings.isShowing())
+                    dialogAppSettings.show();
             }
         } catch (Exception e){
             ExceptionReporter.handle(e);
@@ -546,7 +644,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                             getString(R.string.alert_dialog_gps_title)
                             ,getString(R.string.alert_dialog_gps_message)
                             ,getString(R.string.label_btn_location_settings)
-                            , () -> {
+                            , (dialog, which) -> {
                                 Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                                 startActivity(intent);
                             }
@@ -561,4 +659,31 @@ public abstract class CustomActivity extends AppCompatActivity {
         }
     }
 
+    private class PermissionRequest {
+        private final String permissionRequestStatement;
+        private final Runnable permissionCallback;
+        public PermissionRequest(String statement, Runnable callback){
+            permissionRequestStatement = statement;
+            permissionCallback = callback;
+        }
+        public void askPermission() {
+            mUXToolkit.showConfirmDialogue(
+                    "Permission Required"
+                    , permissionRequestStatement
+                    , "Proceed Request"
+                    , "Cancel"
+                    , new UXEventListeners.ConfirmDialogueEventsListener() {
+                        @Override
+                        public void onCancel(DialogInterface dialog, int which) {
+                            dialog.dismiss();
+                        }
+
+                        @Override
+                        public void onOK(DialogInterface dialog, int which) {
+                            permissionCallback.run();
+                        }
+                    }
+            );
+        }
+    }
 }

@@ -19,6 +19,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
@@ -49,19 +50,17 @@ public class LocationService extends Service implements LocationListener {
     protected LocationManager mLocationManager;
     protected Location mLocation;
 
-    private static final String[] PERMISSIONS_REQUIRED = new String[]{
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-    };
 
     public static String[] getPermissionsRequired(){
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            String[] permissions = new String[PERMISSIONS_REQUIRED.length + 1];
-            System.arraycopy(PERMISSIONS_REQUIRED, 0, permissions, 0, PERMISSIONS_REQUIRED.length);
-            permissions[PERMISSIONS_REQUIRED.length] = Manifest.permission.ACCESS_BACKGROUND_LOCATION;
-            return permissions;
-        }
-        return PERMISSIONS_REQUIRED;
+        return new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        };
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.Q)
+    public static String[] getPermissionBackground(){
+        return new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION};
     }
 
     public static boolean hasPermissions(Context context){
@@ -71,10 +70,24 @@ public class LocationService extends Service implements LocationListener {
         return has;
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
+    public static boolean hasPermissionBackground(Context context){
+            return ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
     public static void requestPermissions(Activity activity){
         ActivityCompat.requestPermissions(
                 activity,
                 getPermissionsRequired(),
+                PERMISSION_REQUEST_CODE
+        );
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.Q)
+    public static void requestPermissionBackground(Activity activity){
+        ActivityCompat.requestPermissions(
+                activity,
+                getPermissionBackground(),
                 PERMISSION_REQUEST_CODE
         );
     }
