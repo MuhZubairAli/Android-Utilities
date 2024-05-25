@@ -32,7 +32,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.lifecycle.Lifecycle;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -69,7 +68,7 @@ public abstract class CustomActivity extends AppCompatActivity {
 
     private final List<String> mPermissions = new ArrayList<>();
     private final List<String> mSpecialPermissions = new ArrayList<>(2);
-    private final Stack<PermissionRequest> mSpecialPermissionRequests = new Stack<>();
+    private final Stack<PermissionRequestHandler> mSpecialPermissionRequests = new Stack<>();
     private ActivityResultLauncher<String[]> requestPermissionLauncher;
 
     private LayoutInflater mLayoutInflater;
@@ -165,7 +164,7 @@ public abstract class CustomActivity extends AppCompatActivity {
 
     private void initialize(){
         mUXToolkit = new UXToolkit(this);
-        mFileManager = new FileManager(this.getApplicationContext());
+        mFileManager = FileManager.getInstance(this);
 
         GPS_PROVIDER_ACCESS = new BroadcastReceiver() {
             @Override
@@ -308,12 +307,16 @@ public abstract class CustomActivity extends AppCompatActivity {
         requestPermissionLauncher.launch(permissions);
     }
 
+    protected void addSpecialPermissionHandler(PermissionRequestHandler request){
+        mSpecialPermissionRequests.push(request);
+    }
+
     protected void requestSpecialPermissions(){
         for (String perm : getSpecialPermissions()){
             if (perm.equals(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU && !Environment.isExternalStorageManager()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
                     mSpecialPermissionRequests.push(
-                        new PermissionRequest(
+                        new PermissionRequestHandler(
                             "In order to read and write files to external storage, Permission to manage all files is required, Please enable the option of 'Allow access to manage all files' on next screen."
                             , ()-> {
                                 Uri uri = Uri.parse("package:" + CustomActivity.this.getPackageName());
@@ -325,7 +328,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                 }
             } else if (perm.equals(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
                 mSpecialPermissionRequests.push(
-                    new PermissionRequest(
+                    new PermissionRequestHandler(
                         "This application requires background location to work properly, Please enable the option of 'Allow all the time' on Location Permissions screen."
                         , ()->{
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -347,10 +350,23 @@ public abstract class CustomActivity extends AppCompatActivity {
 
     //only call this from Activity construction
     //because mPermission is consumed in onCreate()
-    protected void includePermission(String permission){
-        if(this.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.CREATED))
-            throw new RuntimeException("In order to include new permission ["+permission+"], call includePermission(String) from activity constructor.");
-        mPermissions.add(permission);
+    protected boolean addPermissions(String... permissions){
+        if (permissions == null || permissions.length == 0)
+            return false;
+        mPermissions.addAll(
+                Arrays.asList(permissions)
+        );
+        return true;
+    }
+
+    protected boolean addSpecialPermissions(String... permissions){
+        if (permissions == null || permissions.length == 0)
+            return false;
+
+        mSpecialPermissions.addAll(
+                Arrays.asList(permissions)
+        );
+        return true;
     }
 
     protected void setActivityTitle(@NonNull String title, @Nullable String subtitle){
@@ -433,11 +449,15 @@ public abstract class CustomActivity extends AppCompatActivity {
         return mLayoutInflater;
     }
 
-    protected LocationService getLocationService(){
+    public LocationService getLocationService(){
         return mLocationService;
     }
     public UXToolkit getUXToolkit(){
         return mUXToolkit;
+    }
+
+    public FileManager getFileManager(){
+        return mFileManager;
     }
 
     public void addLocationChangeGlobalCallback(String index, ILocationChangeCallback callback) {
@@ -636,7 +656,7 @@ public abstract class CustomActivity extends AppCompatActivity {
         }
     }
 
-    private void showAlertLocationSettings(){
+    protected void showAlertLocationSettings(){
         try {
             if (!isDestroyed() && !isFinishing()) {
                 if(dialogLocationSettings == null) {
@@ -659,10 +679,10 @@ public abstract class CustomActivity extends AppCompatActivity {
         }
     }
 
-    private class PermissionRequest {
+    protected class PermissionRequestHandler {
         private final String permissionRequestStatement;
         private final Runnable permissionCallback;
-        public PermissionRequest(String statement, Runnable callback){
+        public PermissionRequestHandler(String statement, Runnable callback){
             permissionRequestStatement = statement;
             permissionCallback = callback;
         }

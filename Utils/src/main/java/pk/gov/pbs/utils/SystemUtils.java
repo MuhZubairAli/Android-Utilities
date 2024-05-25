@@ -12,6 +12,7 @@ import android.os.Build;
 import android.telephony.TelephonyManager;
 
 import java.io.UnsupportedEncodingException;
+import java.security.NoSuchAlgorithmException;
 
 public class SystemUtils {
     public static long getUnixTs(){
@@ -47,10 +48,8 @@ public class SystemUtils {
                 sb.append(Integer.toHexString((array[i] & 0xFF) | 0x100).substring(1,3));
             }
             return sb.toString();
-        } catch (java.security.NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch(UnsupportedEncodingException ex){
-            ex.printStackTrace();
+        } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+            ExceptionReporter.handle(e);
         }
         return "";
     }

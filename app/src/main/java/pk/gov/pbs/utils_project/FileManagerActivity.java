@@ -19,7 +19,6 @@ import pk.gov.pbs.utils.CustomActivity;
 import pk.gov.pbs.utils.FileManager;
 
 public class FileManagerActivity extends CustomActivity {
-    FileManager mFileManager;
     TableLayout tblFiles;
 
     @Override
@@ -34,7 +33,6 @@ public class FileManagerActivity extends CustomActivity {
         });
 
         ((TextView) findViewById(R.id.tvApiLevel)).setText(Utils.getDeviceOS());
-        mFileManager = new FileManager(this);
         tblFiles = findViewById(R.id.tblExternalFiles);
         showRootFiles();
     }
@@ -68,28 +66,34 @@ public class FileManagerActivity extends CustomActivity {
 
     public void createFileExternal(View view) {
         String content = ((EditText) findViewById(R.id.etText)).getText().toString();
-        if(
-        mFileManager.writeFile(
-                mFileManager.getFileExternalPublic("Test","File","Another","Test.txt")
-                ,content
-                , MODE_APPEND
-        ))
+        if (
+                FileManager
+                        .pathToFile("UtilNewWay","World","External","Test.txt")
+                        .inPublic()
+                        .write(content)
+        )
             mUXToolkit.showToast("External File Created");
     }
 
     public void readFileExternal(View view) {
-        String content = mFileManager.readFile(mFileManager.getFileExternalPublic("Test","File","Another","Test.txt"));
+        String content = FileManager.pathToFile("UtilNewWay","World","External","Test.txt").inPublic().read();
         mUXToolkit.showAlertDialogue("External Public File", content);
     }
 
     public void createFilePrivate(View view) {
         String content = ((EditText) findViewById(R.id.etText)).getText().toString();
-        if(mFileManager.writeFileExternalPrivate("Test", "Text", "file.txt", content, MODE_APPEND))
+        if(
+                mFileManager.writeFileString(
+                mFileManager.getFileExternalPrivate("Hello","World","internal.txt"),
+                content, MODE_APPEND)
+        )
             mUXToolkit.showToast("External Private File Created");
     }
 
     public void readFilePrivate(View view) {
-        String content = mFileManager.readFileExternalPrivate("Test", "Text", "internal.txt");
+        String content = mFileManager.readFileString(
+                mFileManager.getFileExternalPrivate("Test","Private","File","internal.txt")
+        );
         mUXToolkit.showAlertDialogue("External Private File", content);
     }
     public void createFileInternal(View view) {
@@ -103,4 +107,21 @@ public class FileManagerActivity extends CustomActivity {
         mUXToolkit.showAlertDialogue("Internal Public File", content);
     }
 
+    public void debug(View view) {
+        String content = "some random content here, for testing new internal apis...\n";
+        FileManager.pathToFile("Utils","Test","test.txt").inPublic().append(content);
+        FileManager.pathToFile("Utils","Test","test.txt").inPrivate().append(content);
+        FileManager.pathToFile("Example", "1.txt").inPrivateCache().append(content);
+        FileManager.pathToFile("Example", "2.txt").inPrivateCache().append(content);
+        FileManager.pathToFile("Test", "3.txt").inPrivateCache().append(content);
+
+        FileManager.pathToFile("Test", "Utils", "test.txt").inInternal().append(content);
+        FileManager.pathToFile("Test", "text.txt").inInternal().append(content);
+        FileManager.pathToFile("cache.txt").inInternalCache().append(content);
+        FileManager.pathToFile("Example","1.txt").inInternalCache().append(content);
+        FileManager.pathToFile("Example","2.txt").inInternalCache().append(content);
+        FileManager.pathToFile("Example","3.txt").inInternalCache().append(content);
+
+        mUXToolkit.showToast("Debug completed, files created in all areas");
+    }
 }

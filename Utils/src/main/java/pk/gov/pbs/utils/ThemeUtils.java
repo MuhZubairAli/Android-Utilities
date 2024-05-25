@@ -45,11 +45,7 @@ public class ThemeUtils {
 
     public static void applyThemedDrawableToView(View view, int resId){
         Context context = view.getContext();
-        TypedArray a = context.getTheme().obtainStyledAttributes(new int[] {resId});
-        int attributeResourceId = a.getResourceId(0, 0);
-        Drawable drawable = context.getResources().getDrawable(attributeResourceId);
-        view.setBackground(drawable);
-        a.recycle();
+        view.setBackground(getDrawableByTheme(context, resId));
     }
 
     public static Drawable getDrawableByTheme(Context context, int resId) {
