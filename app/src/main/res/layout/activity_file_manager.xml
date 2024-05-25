@@ -123,6 +123,13 @@
                 android:onClick="readFileInternal"
                 />
 
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Debug"
+                android:onClick="debug"
+                />
+
         </LinearLayout>
 
     </ScrollView>
