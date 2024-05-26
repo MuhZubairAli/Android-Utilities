@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".TextActivity">
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Apply Urdu Font"
+            android:onClick="applyFont"
+            android:layout_margin="@dimen/spaceSmall"
+            />
+
+        <TextView
+            android:id="@+id/poem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/txt_poem"
+            android:layout_margin="@dimen/spaceSmall"
+            />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Switch Unordered List and Simple Text"
+            android:onClick="switchList"
+            android:layout_margin="@dimen/spaceSmall"
+            />
+
+        <TextView
+            android:id="@+id/tvList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/spaceSmall"
+            />
+    </LinearLayout>
+</ScrollView>

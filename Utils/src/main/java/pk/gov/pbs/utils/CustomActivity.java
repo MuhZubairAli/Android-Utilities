@@ -54,10 +54,8 @@ public abstract class CustomActivity extends AppCompatActivity {
                     | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
 
     private boolean IS_LOCATION_SERVICE_BOUND = false;
-    private boolean USING_LOCATION_SERVICE = false;
     private ActionBar actionBar;
     private AlertDialog dialogLocationSettings;
-    private AlertDialog dialogStorageManagerPermission;
     private AlertDialog dialogAppSettings;
 
     private Runnable mAfterLocationServiceStartCallback;
@@ -84,11 +82,10 @@ public abstract class CustomActivity extends AppCompatActivity {
     @Override
     protected void onPostResume() {
         super.onPostResume();
-        if (USING_LOCATION_SERVICE) {
-            if (mLocationService != null) {
-                if (!mLocationService.isNetworkEnabled() && !mLocationService.isGPSEnabled())
-                    showAlertLocationSettings();
-            }
+
+        if (mLocationService != null) {
+            if (!mLocationService.isNetworkEnabled() && !mLocationService.isGPSEnabled())
+                showAlertLocationSettings();
         }
 
         if (!mSpecialPermissionRequests.isEmpty())
@@ -98,12 +95,8 @@ public abstract class CustomActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (USING_LOCATION_SERVICE) {
-            if (getLocationService() != null)
-                getLocationService().
-                        clearLocalCallbacks(this);
-            stopLocationService();
-        }
+        if (getLocationService() != null)
+            getLocationService().clearLocalLocationChangeCallbacks(this);
     }
 
 //    For android 11 and below, onRequestPermissionsResult() will be called
@@ -327,20 +320,24 @@ public abstract class CustomActivity extends AppCompatActivity {
                     );
                 }
             } else if (perm.equals(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-                mSpecialPermissionRequests.push(
-                    new PermissionRequestHandler(
-                        "This application requires background location to work properly, Please enable the option of 'Allow all the time' on Location Permissions screen."
-                        , ()->{
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION});
+                if (
+                        ActivityCompat.shouldShowRequestPermissionRationale(this, perm) &&
+                        ActivityCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    mSpecialPermissionRequests.push(
+                            new PermissionRequestHandler(
+                                    "This application requires background location to work properly, Please enable the option of 'Allow all the time' on Location Permissions screen."
+                                    , () -> {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION});
+                                }
                             }
-                        }
-                    )
-                );
+                            )
+                    );
+                }
             } else { // else if(other special permission) handle requesting of other special permission (if any)
                 throw new RuntimeException("Special permission ["+perm+"] is not has the implementation for requesting permission yet");
             }
-            mSpecialPermissions.remove(perm);
         }
 
         // Initiating the loop of requesting special permissions, other permissions requests are handled in on onResume()
@@ -488,7 +485,7 @@ public abstract class CustomActivity extends AppCompatActivity {
     public void addLocationChangeCallback(ILocationChangeCallback callback) {
         StaticUtils.getHandler().postDelayed(()-> {
             if (getLocationService() != null) {
-                getLocationService().addLocalLocationChangedCallback(this, callback);
+                getLocationService().addLocalLocationChangeCallback(this, callback);
             } else {
                 if (++mLocationAttachAttempts >= 5) {
                     Exception e =  new Exception("addLocationChangeCallback] - Attempt to add location listener to LocationService failed after 5 tries, Location service has not started, make sure startLocationService() is called before adding listener");
@@ -540,7 +537,6 @@ public abstract class CustomActivity extends AppCompatActivity {
                 @Override
                 public void onServiceDisconnected(ComponentName name) {
                     mLocationService = null;
-                    USING_LOCATION_SERVICE = false;
                 }
             };
         }
@@ -555,21 +551,17 @@ public abstract class CustomActivity extends AppCompatActivity {
 
         IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_RECEIVER_ACTION_PROVIDER_DISABLED);
         registerReceiver(GPS_PROVIDER_ACCESS, intentFilter);
-        USING_LOCATION_SERVICE = true;
     }
 
     protected void stopLocationService(){
-        if (USING_LOCATION_SERVICE) {
-            if (mLocationService != null) {
-                if (GPS_PROVIDER_ACCESS.isOrderedBroadcast())
-                    unregisterReceiver(GPS_PROVIDER_ACCESS);
-                if (IS_LOCATION_SERVICE_BOUND) {
-                    unbindService(mLocationServiceConnection);
-                    IS_LOCATION_SERVICE_BOUND = false;
-                }
-                stopService(new Intent(this, LocationService.class));
+        if (mLocationService != null) {
+            if (GPS_PROVIDER_ACCESS.isOrderedBroadcast())
+                unregisterReceiver(GPS_PROVIDER_ACCESS);
+            if (IS_LOCATION_SERVICE_BOUND) {
+                unbindService(mLocationServiceConnection);
+                IS_LOCATION_SERVICE_BOUND = false;
             }
-            USING_LOCATION_SERVICE = false;
+            stopService(new Intent(this, LocationService.class));
         }
     }
 

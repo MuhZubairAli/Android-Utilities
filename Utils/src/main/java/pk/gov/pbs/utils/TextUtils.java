@@ -17,7 +17,7 @@ public class TextUtils {
         if (strings != null && strings.length > 0) {
             for (String str : strings){
                 if (str != null)
-                    sb.append(bullet).append(str).append("<br />");
+                    sb.append("&nbsp;&nbsp;&nbsp;&nbsp;").append(bullet).append(str).append("<br />");
             }
         }
         return Html.fromHtml(sb.toString());
