@@ -10,7 +10,6 @@ import android.text.Html;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -41,7 +40,7 @@ public class DebugActivity extends CustomActivity {
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                if (intent.getAction().equalsIgnoreCase(LocationService.BROADCAST_RECEIVER_ACTION_LOCATION_CHANGED)){
+                if (intent.getAction().equalsIgnoreCase(LocationService.BROADCAST_ACTION_LOCATION_CHANGED)){
                     Location location = intent.getParcelableExtra(LocationService.BROADCAST_EXTRA_LOCATION_DATA);
                     String loc = DateTimeUtil.getCurrentDateTimeString() + "<br />\n";
                     Map<String, String> map = new HashMap<>();
@@ -61,7 +60,7 @@ public class DebugActivity extends CustomActivity {
         };
 
         IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(LocationService.BROADCAST_RECEIVER_ACTION_LOCATION_CHANGED);
+        intentFilter.addAction(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
         registerReceiver(receiver, intentFilter);
 
     }

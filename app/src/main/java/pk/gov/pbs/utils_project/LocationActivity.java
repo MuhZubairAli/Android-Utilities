@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.location.Location;
-import android.os.Build;
 import android.os.Bundle;
 import android.widget.TableLayout;
 import android.widget.TableRow;
@@ -67,14 +66,14 @@ public class LocationActivity extends CustomActivity {
 
         findViewById(R.id.btnPermissions).setOnClickListener((v) -> {
             if (!LocationService.hasAllPermissions(this)) {
-                LocationService.requestPermissions(this);
+                LocationService.requestRequiredPermissions(this);
             }
             else
                 mUXToolkit.showToast("All permissions granted!");
         });
 
         IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(LocationService.BROADCAST_RECEIVER_ACTION_LOCATION_CHANGED);
+        intentFilter.addAction(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
         locationReceiver = new LocationBroadcast();
         registerReceiver(locationReceiver, intentFilter);
     }
@@ -122,7 +121,7 @@ public class LocationActivity extends CustomActivity {
     public class LocationBroadcast extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equalsIgnoreCase(LocationService.BROADCAST_RECEIVER_ACTION_LOCATION_CHANGED)
+            if (intent.getAction().equalsIgnoreCase(LocationService.BROADCAST_ACTION_LOCATION_CHANGED)
             || intent.getAction().equalsIgnoreCase("android.location.LOCATION_CHANGED")) {
                 Location location = intent.getParcelableExtra(LocationService.BROADCAST_EXTRA_LOCATION_DATA);
                 if (location != null) {

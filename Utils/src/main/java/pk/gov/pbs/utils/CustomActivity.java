@@ -549,7 +549,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                     mLocationServiceConnection, Context.BIND_AUTO_CREATE);
         }
 
-        IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_RECEIVER_ACTION_PROVIDER_DISABLED);
+        IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_PROVIDER_DISABLED);
         registerReceiver(GPS_PROVIDER_ACCESS, intentFilter);
     }
 

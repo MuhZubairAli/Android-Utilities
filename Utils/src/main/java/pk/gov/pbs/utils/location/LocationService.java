@@ -38,11 +38,11 @@ import pk.gov.pbs.utils.exceptions.InvalidIndexException;
 
 public class LocationService extends Service {
     private static final String TAG = ":Utils] LocationService";
-    public static final String BROADCAST_RECEIVER_ACTION_PROVIDER_DISABLED = Constants.Location.BROADCAST_RECEIVER_ACTION_PROVIDER_DISABLED;
-    public static final String BROADCAST_RECEIVER_ACTION_LOCATION_CHANGED = Constants.Location.BROADCAST_RECEIVER_ACTION_LOCATION_CHANGED;
+    public static final String BROADCAST_ACTION_PROVIDER_DISABLED = Constants.Location.BROADCAST_ACTION_PROVIDER_DISABLED;
+    public static final String BROADCAST_ACTION_LOCATION_CHANGED = Constants.Location.BROADCAST_ACTION_LOCATION_CHANGED;
     public static final String BROADCAST_EXTRA_LOCATION_DATA = Constants.Location.BROADCAST_EXTRA_LOCATION_DATA;
+    public static final int PERMISSION_REQUEST_CODE = 10;
     private static final int SERVICE_NOTIFICATION_ID = 1;
-    private static final int PERMISSION_REQUEST_CODE = 10;
     private HashMap<String, List<ILocationChangeCallback>> mOnLocationChangedLocalCallbacks;
     private HashMap<String, ILocationChangeCallback> mOnLocationChangedGlobalCallbacks;
     private List<ILocationChangeCallback> mListOTCs;
@@ -62,14 +62,14 @@ public class LocationService extends Service {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.Q)
-    public static String[] getPermissionBackground(){
-        return new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION};
+    public static String getPermissionBackgroundAccess(){
+        return Manifest.permission.ACCESS_BACKGROUND_LOCATION;
     }
 
     public static boolean hasAllPermissions(Context context){
         boolean has = hasRequiredPermissions(context);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-            has = has && hasPermissionBackground(context);
+            has = has && hasPermissionBackgroundAccess(context);
         return has;
     }
 
@@ -81,25 +81,34 @@ public class LocationService extends Service {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.Q)
-    public static boolean hasPermissionBackground(Context context){
+    public static boolean hasPermissionBackgroundAccess(Context context){
         return ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    public static void requestPermissions(Activity activity){
+    public static void requestRequiredPermissions(Activity activity){
         ActivityCompat.requestPermissions(
                 activity,
                 getPermissionsRequired(),
                 PERMISSION_REQUEST_CODE
         );
     }
+
+    public static void requestAllPermissions(Activity activity){
+        ActivityCompat.requestPermissions(
+                activity,
+                getPermissionsRequired(),
+                PERMISSION_REQUEST_CODE
+        );
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.Q)
     public static void requestPermissionBackground(Activity activity){
         if (ActivityCompat.shouldShowRequestPermissionRationale( activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION))
-            Toast.makeText(activity, "Please grant background location permission", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, "Please select option 'Allow all the time' in order to grant background location access permission", Toast.LENGTH_SHORT).show();
 
         ActivityCompat.requestPermissions(
                 activity,
-                getPermissionBackground(),
+                new String[]{getPermissionBackgroundAccess()},
                 PERMISSION_REQUEST_CODE
         );
     }
@@ -118,8 +127,6 @@ public class LocationService extends Service {
         super.onCreate();
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         mLocationListener = new LocationServiceListener();
-        if(!requestLocationUpdates())
-            ExceptionReporter.handle(new Exception("Failed to request location updates"));
     }
 
     @Override
@@ -129,6 +136,9 @@ public class LocationService extends Service {
                 .setContentText("Observing device location")
                 .setSmallIcon(R.drawable.ic_auto_mode)
                 .build();
+
+        if(!requestLocationUpdates())
+            ExceptionReporter.handle(new Exception("Failed to request location updates"));
 
         startForeground(SERVICE_NOTIFICATION_ID, notification);
         return START_STICKY;
@@ -294,7 +304,7 @@ public class LocationService extends Service {
         @Override
         public void onProviderDisabled(@NonNull String provider) {
             Intent intent = new Intent();
-            intent.setAction(BROADCAST_RECEIVER_ACTION_PROVIDER_DISABLED);
+            intent.setAction(BROADCAST_ACTION_PROVIDER_DISABLED);
             sendBroadcast(intent);
         }
 
@@ -313,7 +323,7 @@ public class LocationService extends Service {
                     .from(LocationService.this).notify(SERVICE_NOTIFICATION_ID, notification);
 
             Intent intent = new Intent();
-            intent.setAction(BROADCAST_RECEIVER_ACTION_LOCATION_CHANGED);
+            intent.setAction(BROADCAST_ACTION_LOCATION_CHANGED);
             intent.putExtra(BROADCAST_EXTRA_LOCATION_DATA, location);
             sendBroadcast(intent);
 
