@@ -19,16 +19,6 @@
             android:name=".UxActivity"
             android:exported="false" />
 
-        <receiver
-            android:name=".LocationActivity$LocationBroadcast"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.location.PROVIDERS_CHANGED" />
-                <action android:name="android.location.LOCATION_CHANGED" />
-            </intent-filter>
-        </receiver>
-
         <activity
             android:name=".LocationActivity"
             android:exported="false" />

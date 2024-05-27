@@ -38,6 +38,12 @@
         <Button
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="Open Location Settings"
+            android:id="@+id/btnLocSettings" />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Start Location Service"
             android:id="@+id/btnStart" />
 
@@ -52,6 +58,12 @@
             android:layout_height="wrap_content"
             android:text="Get Location"
             android:id="@+id/btnLocation" />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Get Last Known Location"
+            android:id="@+id/btnLastKnown" />
 
         <TextView
             android:layout_width="match_parent"

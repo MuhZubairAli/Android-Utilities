@@ -63,4 +63,18 @@ public class StaticUtils {
             return webRequestQueue;
         }
     }
+
+    public static boolean ClassAChildOfClassB(Class<?> ClassA, Class<?> ClassB){
+        if (ClassA == null || ClassB == null)
+            return false;
+        if (ClassA == ClassB)
+            return true;
+        Class<?> child = ClassA.getSuperclass();
+        while (child != null) {
+            if (child == ClassB)
+                return true;
+            child = child.getSuperclass();
+        }
+        return false;
+    }
 }

@@ -3,6 +3,7 @@ package pk.gov.pbs.utils.location;
 import android.Manifest;
 import android.app.Activity;
 import android.app.Notification;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -38,11 +39,13 @@ import pk.gov.pbs.utils.exceptions.InvalidIndexException;
 
 public class LocationService extends Service {
     private static final String TAG = ":Utils] LocationService";
-    public static final String BROADCAST_ACTION_PROVIDER_DISABLED = Constants.Location.BROADCAST_ACTION_PROVIDER_DISABLED;
-    public static final String BROADCAST_ACTION_LOCATION_CHANGED = Constants.Location.BROADCAST_ACTION_LOCATION_CHANGED;
-    public static final String BROADCAST_EXTRA_LOCATION_DATA = Constants.Location.BROADCAST_EXTRA_LOCATION_DATA;
+    public static final String BROADCAST_ACTION_PROVIDER_DISABLED = LocationService.class.getCanonicalName() + ".ProviderDisabled";
+    public static final String BROADCAST_ACTION_LOCATION_CHANGED = LocationService.class.getCanonicalName() + ".LocationChanged";
+    public static final String BROADCAST_EXTRA_LOCATION_DATA = LocationService.class.getCanonicalName() + ".CurrentLocation";
+    public static final String NOTIFICATION_EXTRA_PENDING_INTENT = LocationService.class.getCanonicalName() + ".ServicePendingIntent";
     public static final int PERMISSION_REQUEST_CODE = 10;
     private static final int SERVICE_NOTIFICATION_ID = 1;
+    private static LocationService instance;
     private HashMap<String, List<ILocationChangeCallback>> mOnLocationChangedLocalCallbacks;
     private HashMap<String, ILocationChangeCallback> mOnLocationChangedGlobalCallbacks;
     private List<ILocationChangeCallback> mListOTCs;
@@ -93,14 +96,6 @@ public class LocationService extends Service {
         );
     }
 
-    public static void requestAllPermissions(Activity activity){
-        ActivityCompat.requestPermissions(
-                activity,
-                getPermissionsRequired(),
-                PERMISSION_REQUEST_CODE
-        );
-    }
-
     @RequiresApi(api = Build.VERSION_CODES.Q)
     public static void requestPermissionBackground(Activity activity){
         if (ActivityCompat.shouldShowRequestPermissionRationale( activity, Manifest.permission.ACCESS_BACKGROUND_LOCATION))
@@ -127,20 +122,29 @@ public class LocationService extends Service {
         super.onCreate();
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         mLocationListener = new LocationServiceListener();
+        instance = this;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Notification notification = new NotificationCompat.Builder(this, Constants.Notification_Channel_ID)
-                .setContentTitle(notificationTitle)
-                .setContentText("Observing device location")
-                .setSmallIcon(R.drawable.ic_auto_mode)
-                .build();
+        if (Constants.DEBUG_MODE)
+            Log.d(TAG, "onStartCommand: Location service started");
 
+        NotificationCompat.Builder notification = new NotificationCompat.Builder(this, Constants.Notification_Channel_ID)
+                .setContentTitle(notificationTitle)
+                .setContentText("Finding device location...")
+                .setSmallIcon(R.drawable.ic_auto_mode);
+
+        Bundle bundle;
+        if (intent != null && (bundle = intent.getExtras()) != null && bundle.containsKey(NOTIFICATION_EXTRA_PENDING_INTENT)){
+            PendingIntent pendingIntent = bundle.getParcelable(NOTIFICATION_EXTRA_PENDING_INTENT);
+            notification.setContentIntent(pendingIntent);
+        }
+
+        startForeground(SERVICE_NOTIFICATION_ID, notification.build());
         if(!requestLocationUpdates())
             ExceptionReporter.handle(new Exception("Failed to request location updates"));
 
-        startForeground(SERVICE_NOTIFICATION_ID, notification);
         return START_STICKY;
     }
 
@@ -148,14 +152,66 @@ public class LocationService extends Service {
     public void onDestroy() {
         super.onDestroy();
         mLocationManager.removeUpdates(mLocationListener);
+        instance = null;
     }
 
-    public synchronized static void start(Context context){
+    private void pauseLocationUpdates(){
+        mLocationManager.removeUpdates(mLocationListener);
+    }
+
+    private void resumeLocationUpdates(){
+        requestLocationUpdates();
+    }
+
+    public static void pause(){
+        if (isRunning())
+            getInstance().pauseLocationUpdates();
+    }
+
+    public static void resume(){
+        if (isRunning())
+            getInstance().resumeLocationUpdates();
+    }
+
+    public static void stop(Context context){
+        Intent intent = new Intent(context, LocationService.class);
+        context.stopService(intent);
+    }
+
+    public static LocationService getInstance(){
+        return instance;
+    }
+
+    public static boolean isRunning(){
+        return instance != null;
+    }
+
+    public static void start(Context context){
+        start(context, null);
+    }
+
+    public synchronized static void start(Context context, Class<? extends Context> pendingIntentClass){
         if (LocationService.hasRequiredPermissions(context)) {
+            Intent intent = new Intent(context, LocationService.class);
+            if (pendingIntentClass != null){
+                Bundle bundle = new Bundle();
+                bundle.putParcelable(
+                        LocationService.NOTIFICATION_EXTRA_PENDING_INTENT,
+                        PendingIntent.getActivity(
+                                context,
+                                0,
+                                new Intent(context, pendingIntentClass),
+                                PendingIntent.FLAG_UPDATE_CURRENT |
+                                PendingIntent.FLAG_IMMUTABLE
+                        )
+                );
+                intent.putExtras(bundle);
+            }
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(new Intent(context, LocationService.class));
+                context.startForegroundService(intent);
             } else
-                context.startService(new Intent(context, LocationService.class));
+                context.startService(intent);
         } else
             ExceptionReporter.handle(new Exception("can not start LocationService, Permissions pertaining to LocationService not granted"));
     }
@@ -172,7 +228,7 @@ public class LocationService extends Service {
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "requestLocationUpdates]: requesting location updates");
 
-        if (hasAllPermissions(this)) {
+        if (hasAllPermissions(this) || hasRequiredPermissions(this)) {
             if (isGPSEnabled() || isNetworkEnabled()) {
                 if (isNetworkEnabled()) {
                     mLocationManager.requestLocationUpdates(
@@ -192,8 +248,7 @@ public class LocationService extends Service {
                 return true;
             }
         } else {
-            if (Constants.DEBUG_MODE)
-                Log.d(TAG, "requestLocationUpdates]: Permissions for location access not granted");
+            throw new SecurityException("all permissions pertaining to LocationService not granted");
         }
         return false;
     }

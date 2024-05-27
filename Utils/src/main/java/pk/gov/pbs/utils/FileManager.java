@@ -12,7 +12,6 @@ import android.provider.Settings;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 
@@ -49,18 +48,16 @@ public class FileManager {
                     Manifest.permission.READ_MEDIA_VIDEO
             };
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return new String[]{
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.MANAGE_EXTERNAL_STORAGE
-            };
-        }
 
         return new String[]{
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
         };
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    public static String getManageStoragePermission(){
+        return Manifest.permission.MANAGE_EXTERNAL_STORAGE;
     }
 
     /**
@@ -70,7 +67,16 @@ public class FileManager {
      * Returns true if has all permissions other wise returns false which indicates
      * that one or more permissions regarding storage are not granted
      */
-    public static boolean hasPermissions(Context context) {
+    public static boolean hasAllPermissions(Context context) {
+        boolean readWritePermission = hasRequiredPermissions(context);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return hasFileManagerPermission() && readWritePermission;
+        }
+        return readWritePermission;
+    }
+
+    private static boolean hasRequiredPermissions(Context context) {
         boolean readWritePermission = true;
         for (String permission : getPermissionsRequired()) {
             if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
@@ -78,29 +84,7 @@ public class FileManager {
                 break;
             }
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return hasFileManagerPermission() && hasFileManagerPermission();
-        }
         return readWritePermission;
-    }
-
-    /**
-     * Requests for all storage related permissions
-     * For API >= 30 it opens up the activity to allow current app the permission to manage all files
-     */
-    public static void requestPermissions(Activity context){
-        if (!hasPermissions(context)) {
-            ActivityCompat.requestPermissions(
-                    context,
-                    getPermissionsRequired(),
-                    REQUEST_EXTERNAL_STORAGE_CODE
-            );
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            requestForFileManagerPermission(context);
-        }
     }
 
     /**
@@ -117,6 +101,30 @@ public class FileManager {
     }
 
     /**
+     * Requests for all storage related permissions
+     * For API >= 30 it opens up the activity to allow current app the permission to manage all files
+     */
+    public static void requestAllPermissions(Activity context){
+        requestRequiredPermissions(context);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            StaticUtils.getHandler().post(()->{
+                requestForFileManagerPermission(context);
+            });
+        }
+    }
+
+    private static void requestRequiredPermissions(Activity context) {
+        if (!hasAllPermissions(context)) {
+            ActivityCompat.requestPermissions(
+                    context,
+                    getPermissionsRequired(),
+                    REQUEST_EXTERNAL_STORAGE_CODE
+            );
+        }
+    }
+
+    /**
      * For API >= 30 this method opens screen for allowing current app to be
      * Manage Application for All Files Access Permission
      * This is required for CRUD operations
@@ -124,7 +132,7 @@ public class FileManager {
     @RequiresApi(api = Build.VERSION_CODES.R)
     public static void requestForFileManagerPermission(Context context){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()){
-            Toast.makeText(context, "On API 30 and above permission to manage all files is required, Please enable the option of \'Allow access to manage all files\'.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "On Android 11 and above permission to manage all files is required, Please enable the option of 'Allow access to manage all files'.", Toast.LENGTH_LONG).show();
             Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
             Uri uri = Uri.fromParts("package", context.getPackageName(), null);
             intent.setData(uri);

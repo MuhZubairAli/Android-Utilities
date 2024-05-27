@@ -38,10 +38,10 @@ public class FileManagerActivity extends CustomActivity {
     }
 
     public void verifyPermissions(View view) {
-        if (FileManager.hasPermissions(this))
+        if (FileManager.hasAllPermissions(this))
             mUXToolkit.showToast("Has all required permissions for storage access");
         else
-            FileManager.requestPermissions(this);
+            FileManager.requestAllPermissions(this);
     }
 
     private void showRootFiles() {
@@ -92,7 +92,7 @@ public class FileManagerActivity extends CustomActivity {
 
     public void readFilePrivate(View view) {
         String content = mFileManager.readFileString(
-                mFileManager.getFileExternalPrivate("Test","Private","File","internal.txt")
+                mFileManager.getFileExternalPrivate("Hello","World","internal.txt")
         );
         mUXToolkit.showAlertDialogue("External Private File", content);
     }
