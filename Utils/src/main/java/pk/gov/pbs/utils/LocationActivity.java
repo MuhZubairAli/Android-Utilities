@@ -91,6 +91,8 @@ public abstract class LocationActivity extends CustomActivity {
     }
 
     public LocationService getLocationService(){
+        if (mLocationService == null && LocationService.isRunning())
+            mLocationService = LocationService.getInstance();
         return mLocationService;
     }
 
@@ -210,14 +212,16 @@ public abstract class LocationActivity extends CustomActivity {
     }
 
     protected void stopLocationService(){
-        if (mLocationService != null) {
-            if (GPS_PROVIDER_ACCESS.isOrderedBroadcast())
+        if (LocationService.isRunning()) {
+            if (GPS_PROVIDER_ACCESS.isOrderedBroadcast()) {
+                GPS_PROVIDER_ACCESS.clearAbortBroadcast();
                 unregisterReceiver(GPS_PROVIDER_ACCESS);
-            if (IS_LOCATION_SERVICE_BOUND) {
+            } if (IS_LOCATION_SERVICE_BOUND) {
                 unbindService(mLocationServiceConnection);
                 IS_LOCATION_SERVICE_BOUND = false;
             }
-            stopService(new Intent(this, LocationService.class));
+            if(!stopService(new Intent(this, LocationService.class)))
+                getLocationService().stopSelf();
         }
     }
 

@@ -228,7 +228,7 @@ public class LocationService extends Service {
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "requestLocationUpdates]: requesting location updates");
 
-        if (hasAllPermissions(this) || hasRequiredPermissions(this)) {
+        if (hasRequiredPermissions(this)) {
             if (isGPSEnabled() || isNetworkEnabled()) {
                 if (isNetworkEnabled()) {
                     mLocationManager.requestLocationUpdates(
@@ -248,7 +248,7 @@ public class LocationService extends Service {
                 return true;
             }
         } else {
-            throw new SecurityException("all permissions pertaining to LocationService not granted");
+            ExceptionReporter.handle(new Exception("required permissions for LocationService not granted"));
         }
         return false;
     }

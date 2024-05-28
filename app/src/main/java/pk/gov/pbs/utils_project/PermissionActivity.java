@@ -72,10 +72,6 @@ public class PermissionActivity extends LocationActivity {
         try {
             PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_PERMISSIONS);
             permissions = info.requestedPermissions;
-
-            for (String permission : permissions) {
-                System.out.println("Requested permission: " + permission);
-            }
         } catch (PackageManager.NameNotFoundException e) {
             ExceptionReporter.handle(e);
         }

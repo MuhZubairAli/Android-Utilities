@@ -25,7 +25,7 @@ public class TextActivity extends AppCompatActivity {
             "Item 2",
             "Item 3",
             "Item 4",
-            "Item 5"
+            "Item 5" 
     };
     int lsi = 1;
     @Override

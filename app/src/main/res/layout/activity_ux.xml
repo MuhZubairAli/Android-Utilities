@@ -33,5 +33,22 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/btnCreateFiles"
+            android:text="Create Files" />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/btnZipFiles"
+            android:text="Zip Files" />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/btnUnzipFiles"
+            android:text="Unzip files" />
     </LinearLayout>
 </ScrollView>

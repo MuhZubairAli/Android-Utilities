@@ -73,7 +73,7 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
         tvLocation = findViewById(R.id.tvLocation);
         tblLocation = findViewById(R.id.tblLocation);
 
-        findViewById(R.id.btnStart).setOnClickListener((v) -> startLocationService());
+        findViewById(R.id.btnStart).setOnClickListener((v) -> startLocationService(MainActivity.class));
         findViewById(R.id.btnStop).setOnClickListener((v) -> stopLocationService());
 
         findViewById(R.id.btnLocation).setOnClickListener((v) -> {
