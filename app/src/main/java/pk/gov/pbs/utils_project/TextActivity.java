@@ -1,6 +1,13 @@
 package pk.gov.pbs.utils_project;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
@@ -15,11 +22,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
+import pk.gov.pbs.utils.CustomActivity;
 import pk.gov.pbs.utils.TextUtils;
 import pk.gov.pbs.utils.ThemeUtils;
+import pk.gov.pbs.utils.location.ILocationChangeCallback;
+import pk.gov.pbs.utils.location.LocationService;
 
-public class TextActivity extends AppCompatActivity {
-
+public class TextActivity extends CustomActivity {
     private static final String[] list = new String[]{
             "Item 1",
             "Item 2",
@@ -39,9 +48,13 @@ public class TextActivity extends AppCompatActivity {
             return insets;
         });
 
+        Utils.setVersionTextAndBehaviour(this, findViewById(R.id.tvApiLevel));
+
         ((TextView)findViewById(R.id.tvList)).setText(
                 String.join(", ", list)
         );
+
+        LocationService.start(this, LocationActivity.class);
     }
 
     public void applyFont(View view) {

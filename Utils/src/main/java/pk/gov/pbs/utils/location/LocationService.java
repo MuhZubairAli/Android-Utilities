@@ -25,9 +25,13 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.WeakHashMap;
 
 import pk.gov.pbs.utils.Constants;
 import pk.gov.pbs.utils.DateTimeUtil;
@@ -39,23 +43,26 @@ import pk.gov.pbs.utils.exceptions.InvalidIndexException;
 
 public class LocationService extends Service {
     private static final String TAG = ":Utils] LocationService";
-    public static final String BROADCAST_ACTION_PROVIDER_DISABLED = LocationService.class.getCanonicalName() + ".ProviderDisabled";
-    public static final String BROADCAST_ACTION_LOCATION_CHANGED = LocationService.class.getCanonicalName() + ".LocationChanged";
-    public static final String BROADCAST_EXTRA_LOCATION_DATA = LocationService.class.getCanonicalName() + ".CurrentLocation";
-    public static final String NOTIFICATION_EXTRA_PENDING_INTENT = LocationService.class.getCanonicalName() + ".ServicePendingIntent";
+    public static final String BROADCAST_ACTION_PROVIDER_DISABLED =
+            LocationService.class.getCanonicalName()+".ProviderDisabled";
+    public static final String BROADCAST_ACTION_LOCATION_CHANGED =
+            LocationService.class.getCanonicalName()+".LocationChanged";
+    public static final String BROADCAST_EXTRA_LOCATION_DATA =
+            LocationService.class.getCanonicalName()+".CurrentLocation";
+    public static final String BROADCAST_EXTRA_NOTIFICATION_INTENT =
+            LocationService.class.getCanonicalName()+".SrvPndIntent";
     public static final int PERMISSION_REQUEST_CODE = 10;
     private static final int SERVICE_NOTIFICATION_ID = 1;
     private static LocationService instance;
-    private HashMap<String, List<ILocationChangeCallback>> mOnLocationChangedLocalCallbacks;
-    private HashMap<String, ILocationChangeCallback> mOnLocationChangedGlobalCallbacks;
     private List<ILocationChangeCallback> mListOTCs;
-    private final LocationServiceBinder mBinder = new LocationServiceBinder();
-    private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 0;
+    private WeakReference<LocationServiceBinder> mBinder;
+    private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 5;
     private static final long MIN_TIME_BW_UPDATES = 1000 * 5;
 
     protected LocationManager mLocationManager;
     protected LocationListener mLocationListener;
     private final String notificationTitle = "Location Service";
+    private PendingIntent mNotificationIntent;
 
     public static String[] getPermissionsRequired(){
         return new String[]{
@@ -136,9 +143,12 @@ public class LocationService extends Service {
                 .setSmallIcon(R.drawable.ic_auto_mode);
 
         Bundle bundle;
-        if (intent != null && (bundle = intent.getExtras()) != null && bundle.containsKey(NOTIFICATION_EXTRA_PENDING_INTENT)){
-            PendingIntent pendingIntent = bundle.getParcelable(NOTIFICATION_EXTRA_PENDING_INTENT);
-            notification.setContentIntent(pendingIntent);
+        if (intent != null && (bundle = intent.getExtras()) != null && bundle.containsKey(BROADCAST_EXTRA_NOTIFICATION_INTENT)){
+            mNotificationIntent = bundle.getParcelable(BROADCAST_EXTRA_NOTIFICATION_INTENT);
+            if (mNotificationIntent != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                mNotificationIntent.isForegroundService();
+            }
+            notification.setContentIntent(mNotificationIntent);
         }
 
         startForeground(SERVICE_NOTIFICATION_ID, notification.build());
@@ -153,14 +163,6 @@ public class LocationService extends Service {
         super.onDestroy();
         mLocationManager.removeUpdates(mLocationListener);
         instance = null;
-    }
-
-    private void pauseLocationUpdates(){
-        mLocationManager.removeUpdates(mLocationListener);
-    }
-
-    private void resumeLocationUpdates(){
-        requestLocationUpdates();
     }
 
     public static void pause(){
@@ -196,7 +198,7 @@ public class LocationService extends Service {
             if (pendingIntentClass != null){
                 Bundle bundle = new Bundle();
                 bundle.putParcelable(
-                        LocationService.NOTIFICATION_EXTRA_PENDING_INTENT,
+                        LocationService.BROADCAST_EXTRA_NOTIFICATION_INTENT,
                         PendingIntent.getActivity(
                                 context,
                                 0,
@@ -214,14 +216,6 @@ public class LocationService extends Service {
                 context.startService(intent);
         } else
             ExceptionReporter.handle(new Exception("can not start LocationService, Permissions pertaining to LocationService not granted"));
-    }
-
-    public boolean isGPSEnabled() {
-        return mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
-    }
-
-    public boolean isNetworkEnabled() {
-        return mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
     }
 
     protected boolean requestLocationUpdates() {
@@ -253,17 +247,35 @@ public class LocationService extends Service {
         return false;
     }
 
-    public void startLocationUpdates() {
-        if (Constants.DEBUG_MODE)
-            Log.d(TAG, "startLocationUpdates]: starting location updates");
-        if(requestLocationUpdates())
-            ExceptionReporter.handle(new Exception("Failed to request location updates"));
+    public void resumeLocationUpdates() {
+        if(!requestLocationUpdates())
+            ExceptionReporter.handle(
+                    new Exception("Failed to request location updates, either providers are disabled or permissions are not granted")
+            );
     }
 
-    public void stopLocationUpdates() {
-        if (Constants.DEBUG_MODE)
-            Log.d(TAG, "stopLocationUpdates]: stopping location updates");
+    public void pauseLocationUpdates() {
         mLocationManager.removeUpdates(mLocationListener);
+    }
+
+    public boolean isGPSEnabled() {
+        return mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
+    public boolean isNetworkEnabled() {
+        return mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+    }
+
+    /**
+     * get available location, first tries to get current location
+     * if current location is null, tries to get last known location
+     * @return available location
+     */
+    public Location getAvailableLocation(){
+        Location location = getLocation();
+        if (location == null)
+            location = getLastKnownLocation();
+        return location;
     }
 
     public Location getLocation() {
@@ -286,21 +298,6 @@ public class LocationService extends Service {
         return gpsLocation == null ? networkLocation :gpsLocation;
     }
 
-    public void addLocationChangeGlobalCallback(String index, ILocationChangeCallback callback) throws InvalidIndexException {
-        if (mOnLocationChangedGlobalCallbacks == null)
-            mOnLocationChangedGlobalCallbacks = new HashMap<>();
-
-        if (mOnLocationChangedGlobalCallbacks.containsKey(index))
-            throw new InvalidIndexException(index, "it already exists");
-
-        mOnLocationChangedGlobalCallbacks.put(index, callback);
-    }
-
-    public void removeLocationChangeGlobalCallback(String index){
-        if (mOnLocationChangedGlobalCallbacks != null)
-            mOnLocationChangedGlobalCallbacks.remove(index);
-    }
-
     /**
      * adds One Time Callback to the service
      * on receiving location it will execute once and then remove it
@@ -309,37 +306,33 @@ public class LocationService extends Service {
     public void addLocationChangedOTC(ILocationChangeCallback otc){
         if (mListOTCs == null)
             mListOTCs = new ArrayList<>();
-
         mListOTCs.add(otc);
-    }
-
-    public void addLocalLocationChangeCallback(Context context, ILocationChangeCallback changedCallback){
-        if (mOnLocationChangedLocalCallbacks == null)
-            mOnLocationChangedLocalCallbacks = new HashMap<>();
-
-        if (mOnLocationChangedLocalCallbacks.containsKey(context.getClass().getSimpleName()))
-            mOnLocationChangedLocalCallbacks.get(context.getClass().getSimpleName()).add(changedCallback);
-        else {
-            List<ILocationChangeCallback> list = new ArrayList<>();
-            list.add(changedCallback);
-            mOnLocationChangedLocalCallbacks.put(context.getClass().getSimpleName(), list);
-        }
-    }
-
-    public void clearLocalLocationChangeCallbacks(Context context){
-        if (mOnLocationChangedLocalCallbacks != null)
-            mOnLocationChangedLocalCallbacks.remove(context.getClass().getSimpleName());
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        return mBinder;
+        requestLocationUpdates(); // onBind startRequesting updates in case location updates are paused
+        mBinder = new WeakReference<>(new LocationServiceBinder());
+        return mBinder.get();
     }
 
-    public class LocationServiceBinder extends Binder {
+    public final class LocationServiceBinder extends Binder {
+        private List<ILocationChangeCallback> mCallbacks;
         public LocationService getService(){
             return LocationService.this;
+        }
+
+        public void setLocationChangeCallbacks(List<ILocationChangeCallback> callbacks){
+            mCallbacks = callbacks;
+        }
+
+        private List<ILocationChangeCallback> getLocationChangeCallbacks() {
+            return mCallbacks;
+        }
+
+        private boolean hasCallbacks(){
+            return mCallbacks != null && !mCallbacks.isEmpty();
         }
     }
 
@@ -368,17 +361,20 @@ public class LocationService extends Service {
             if (Constants.DEBUG_MODE)
                 Log.d(TAG, "onLocationChanged: Location changed : " + location);
 
-            Notification notification = new NotificationCompat.Builder(LocationService.this, Constants.Notification_Channel_ID)
+            NotificationCompat.Builder nBuilder = new NotificationCompat.Builder(LocationService.this, Constants.Notification_Channel_ID)
                     .setContentTitle(notificationTitle)
                     .setContentText("Location received at " + DateTimeUtil.getCurrentDateTime(DateTimeUtil.defaultTimeOnlyFormat))
-                    .setSmallIcon(R.drawable.ic_location)
-                    .build();
+                    .setSmallIcon(R.drawable.ic_location);
+
+            if (mNotificationIntent != null) {
+                nBuilder.setContentIntent(mNotificationIntent);
+            }
 
             NotificationManagerCompat
-                    .from(LocationService.this).notify(SERVICE_NOTIFICATION_ID, notification);
+                    .from(LocationService.this)
+                    .notify(SERVICE_NOTIFICATION_ID, nBuilder.build());
 
-            Intent intent = new Intent();
-            intent.setAction(BROADCAST_ACTION_LOCATION_CHANGED);
+            Intent intent = new Intent(BROADCAST_ACTION_LOCATION_CHANGED);
             intent.putExtra(BROADCAST_EXTRA_LOCATION_DATA, location);
             sendBroadcast(intent);
 
@@ -392,30 +388,11 @@ public class LocationService extends Service {
                 });
             }
 
-            //Executing Local Callbacks
-            if (mOnLocationChangedLocalCallbacks != null && !mOnLocationChangedLocalCallbacks.isEmpty()) {
-                StaticUtils.getHandler().post(()-> {
-                    for (String groupId : mOnLocationChangedLocalCallbacks.keySet()) {
-                        if (!mOnLocationChangedLocalCallbacks.get(groupId).isEmpty()) {
-                            for (ILocationChangeCallback callback : mOnLocationChangedLocalCallbacks.get(groupId)) {
-                                callback.onLocationChange(location);
-                            }
-                        }
+            if (mBinder != null && mBinder.get() != null && mBinder.get().hasCallbacks()){
+                StaticUtils.getHandler().post(() -> {
+                    for (ILocationChangeCallback callback : mBinder.get().getLocationChangeCallbacks()) {
+                        callback.onLocationChange(location);
                     }
-                });
-            }
-
-            //Executing Global Callbacks
-            if (mOnLocationChangedGlobalCallbacks != null && !mOnLocationChangedGlobalCallbacks.isEmpty()){
-                StaticUtils.getHandler().post(()-> {
-                    (new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            for (String callbackIndex : mOnLocationChangedGlobalCallbacks.keySet()){
-                                mOnLocationChangedGlobalCallbacks.get(callbackIndex).onLocationChange(location);
-                            }
-                        }
-                    })).start();
                 });
             }
         }

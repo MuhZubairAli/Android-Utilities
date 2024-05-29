@@ -3,7 +3,12 @@ package pk.gov.pbs.utils;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.Settings;
 import android.text.Html;
 import android.text.Spanned;
 import android.view.LayoutInflater;
@@ -30,6 +35,10 @@ public class UXToolkit {
         context = _context;
         mInputMethodManager = (InputMethodManager) context.getSystemService(Activity.INPUT_METHOD_SERVICE);
         mLayoutInflater = LayoutInflater.from(context);
+    }
+
+    public CustomActivity getContext(){
+        return context;
     }
 
     public AlertDialog.Builder getDialogBuilder(){
@@ -342,4 +351,146 @@ public class UXToolkit {
         }
     }
 
+    public static final class CommonAlerts {
+        private static AlertDialog dialogLocationSettings;
+        private static AlertDialog dialogAppSettings;
+        private static AlertDialog.Builder getDialogBuilder(Context context){
+            return (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) ?
+                    new AlertDialog.Builder(context):
+                    new AlertDialog.Builder(context, R.style.AlertDialogTheme);
+        }
+
+        private static View inflateInfoAlertDialogue(Context context, String title, String message){
+            Spanned htm = Html.fromHtml(message);
+            View dlg = LayoutInflater.from(context).inflate(R.layout.custom_dialogue_alert,null);
+            ((TextView) dlg.findViewById(R.id.tv_title)).setText(title);
+            ((TextView) dlg.findViewById(R.id.tv_message)).setText(htm);
+            return dlg;
+        }
+
+        private static AlertDialog buildAlertDialogue(Context context, String title, String message, @Nullable String positiveButtonLabel, @Nullable UXEventListeners.AlertDialogueEventListener callback){
+            AlertDialog alertDialog;
+            if(positiveButtonLabel == null)
+                positiveButtonLabel = context.getResources().getString(R.string.label_btn_ok);
+
+            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
+                Spanned htm = Html.fromHtml(message);
+                alertDialog = getDialogBuilder(context)
+                        .setTitle(title)
+                        .setMessage(htm)
+                        .setCancelable(false)
+                        .setPositiveButton(
+                                positiveButtonLabel
+                                , (dialog, which) -> {
+                                    if(callback != null)
+                                        callback.onOK(dialog, which);
+                                }
+                        )
+                        .create();
+            } else {
+                alertDialog = getDialogBuilder(context)
+                        .setView(inflateInfoAlertDialogue(context, title, message))
+                        .setCancelable(false)
+                        .setPositiveButton(
+                                positiveButtonLabel
+                                , (dialog, which) -> {
+                                    if(callback != null)
+                                        callback.onOK(dialog, which);
+                                }
+                        )
+                        .create();
+            }
+            return alertDialog;
+        }
+
+        public static AlertDialog buildConfirmDialogue(Context context, String title, String message, @Nullable String positiveBtnLabel, @Nullable String negativeBtnLabel, UXEventListeners.ConfirmDialogueEventsListener events) {
+            if (positiveBtnLabel == null)
+                positiveBtnLabel = context.getResources().getString(R.string.label_btn_ok);
+            if (negativeBtnLabel == null)
+                negativeBtnLabel = "Cancel";
+
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+                try {
+                    Spanned htm = Html.fromHtml(message);
+                    return getDialogBuilder(context)
+                            .setTitle(title)
+                            .setMessage(htm)
+                            .setCancelable(false)
+                            .setPositiveButton(positiveBtnLabel, events::onOK)
+                            .setNegativeButton(negativeBtnLabel, events::onCancel)
+                            .create();
+                } catch (Exception e) {
+                    ExceptionReporter.handle(e);
+                }
+            } else {
+                try {
+                    return getDialogBuilder(context)
+                            .setView(inflateInfoAlertDialogue(context, title, message))
+                            .setCancelable(false)
+                            .setPositiveButton(
+                                    positiveBtnLabel
+                                    , events::onOK)
+                            .setNegativeButton(
+                                    negativeBtnLabel
+                                    , events::onCancel)
+                            .create();
+                } catch (Exception e) {
+                    ExceptionReporter.handle(e);
+                }
+            }
+            return null;
+        }
+
+        public static void showAlertLocationSettings(Context context){
+            if(dialogLocationSettings == null) {
+                dialogLocationSettings = buildAlertDialogue(
+                        context
+                        ,context.getString(R.string.alert_dialog_gps_title)
+                        ,context.getString(R.string.alert_dialog_gps_message)
+                        ,context.getString(R.string.label_btn_location_settings)
+                        , (dialog, which) -> {
+                            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                            context.startActivity(intent);
+                        }
+                );
+            }
+
+            if(!dialogLocationSettings.isShowing())
+                dialogLocationSettings.show();
+        }
+
+        public static void showAlertAppPermissionsSetting(Context context){
+            if(dialogAppSettings == null) {
+                dialogAppSettings = buildConfirmDialogue(
+                        context
+                        , context.getString(R.string.alert_dialog_all_permissions_title)
+                        , context.getString(R.string.alert_dialog_all_permissions_message)
+                        , context.getString(R.string.label_btn_permissions_settings)
+                        , "Cancel"
+                        , new UXEventListeners.ConfirmDialogueEventsListener() {
+                            @Override
+                            public void onCancel(DialogInterface dialog, int which) {
+                                dialogAppSettings.dismiss();
+                            }
+
+                            @Override
+                            public void onOK(DialogInterface dialog, int which) {
+                                final Intent i = new Intent();
+                                i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                i.addCategory(Intent.CATEGORY_DEFAULT);
+                                i.setData(Uri.parse("package:" + context.getPackageName()));
+                                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                                i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                                context.startActivity(i);
+                            }
+                        }
+
+                );
+            }
+            if(!dialogAppSettings.isShowing())
+                dialogAppSettings.show();
+        }
+
+    }
 }

@@ -56,6 +56,18 @@
         <Button
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="Pause Location Updates"
+            android:id="@+id/btnPause" />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Resume Location Updates"
+            android:id="@+id/btnResume" />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Get Location"
             android:id="@+id/btnLocation" />
 

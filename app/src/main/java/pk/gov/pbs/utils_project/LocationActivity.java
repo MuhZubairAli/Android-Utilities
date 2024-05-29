@@ -1,5 +1,7 @@
 package pk.gov.pbs.utils_project;
 
+import static pk.gov.pbs.utils.UXToolkit.CommonAlerts.showAlertLocationSettings;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -8,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -21,43 +24,17 @@ import androidx.core.view.WindowInsetsCompat;
 import java.util.HashMap;
 import java.util.Map;
 
-import pk.gov.pbs.utils.CustomActivity;
 import pk.gov.pbs.utils.DateTimeUtil;
 import pk.gov.pbs.utils.ExceptionReporter;
 import pk.gov.pbs.utils.StaticUtils;
+import pk.gov.pbs.utils.location.ILocationChangeCallback;
 import pk.gov.pbs.utils.location.LocationService;
 
 public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
 
     TextView tvLocation;
     TableLayout tblLocation;
-    BroadcastReceiver locationReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equalsIgnoreCase(LocationService.BROADCAST_ACTION_LOCATION_CHANGED)
-                    || intent.getAction().equalsIgnoreCase("android.location.LOCATION_CHANGED")) {
-                Location location = intent.getParcelableExtra(LocationService.BROADCAST_EXTRA_LOCATION_DATA);
-                if (location != null) {
-                    Map<String, String> map = new HashMap<>();
-                    map.put("Provider", location.getProvider());
-                    map.put("Latitude", location.getLatitude() + "");
-                    map.put("Longitude", location.getLongitude() + "");
-                    map.put("Altitude", location.getAltitude() + "");
-                    map.put("Accuracy", location.getAccuracy() + "");
-                    map.put("Bearing", location.getBearing() + "");
-                    map.put("Speed", location.getSpeed() + "");
-                    map.put("Location Time", DateTimeUtil.formatDateTime(location.getTime()/1000));
-                    map.put("Elapsed Time", DateTimeUtil.formatDateTime(location.getElapsedRealtimeNanos()/1000000));
-                    tvLocation.setText(StaticUtils.toPrettyJson(map));
-                    try {
-                        showLocation(location);
-                    } catch (IllegalAccessException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-        }
-    };
+    BroadcastReceiver locationReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,11 +47,13 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
             return insets;
         });
 
+        Utils.setVersionTextAndBehaviour(this, findViewById(R.id.tvApiLevel));
+
         tvLocation = findViewById(R.id.tvLocation);
         tblLocation = findViewById(R.id.tblLocation);
 
-        findViewById(R.id.btnStart).setOnClickListener((v) -> startLocationService(MainActivity.class));
-        findViewById(R.id.btnStop).setOnClickListener((v) -> stopLocationService());
+        findViewById(R.id.btnStart).setOnClickListener((v) -> startLocationService(this.getClass()));
+        findViewById(R.id.btnStop).setOnClickListener((v) -> unbindLocationService());
 
         findViewById(R.id.btnLocation).setOnClickListener((v) -> {
             if (getLocationService() == null) {
@@ -92,8 +71,21 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
                 }
             }
         });
+        findViewById(R.id.btnPause).setOnClickListener((v) -> {
+            if (getLocationService() == null) {
+                mUXToolkit.showToast("Location service not started!");
+                return;
+            }
+            getLocationService().pauseLocationUpdates();
+        });
 
-        ((TextView) findViewById(R.id.tvApiLevel)).setText(Utils.getDeviceOS());
+        findViewById(R.id.btnResume).setOnClickListener((v) -> {
+            if (getLocationService() == null) {
+                mUXToolkit.showToast("Location service not started!");
+                return;
+            }
+            getLocationService().resumeLocationUpdates();
+        });
 
         findViewById(R.id.btnPermissions).setOnClickListener((v) -> {
             if (!LocationService.hasRequiredPermissions(this)) {
@@ -104,7 +96,7 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
         });
 
         findViewById(R.id.btnLocSettings).setOnClickListener((v) -> {
-            showAlertLocationSettings();
+            showAlertLocationSettings(this);
         });
 
         findViewById(R.id.btnLastKnown).setOnClickListener((v) -> {
@@ -122,9 +114,6 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
                 }
             }
         });
-
-        IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
-        registerReceiver(locationReceiver, intentFilter);
     }
 
     @Override
@@ -148,43 +137,95 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
             }
         }
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (locationReceiver != null) {
+            unregisterReceiver(locationReceiver);
+            locationReceiver = null;
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (locationReceiver == null) {
+            locationReceiver = new LocationChangeReceiver();
+            IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                registerReceiver(locationReceiver, intentFilter, RECEIVER_EXPORTED);
+            } else
+                registerReceiver(locationReceiver, intentFilter);
+        }
+    }
+
     private void showLocation(Location location) throws IllegalAccessException {
         TableRow header = (TableRow) getLayoutInflater().inflate(R.layout.header_row, tblLocation, false);
-        ((TextView) header.findViewById(R.id.tv_1)).setText("Location Received at " + DateTimeUtil.formatDateTime(location.getTime()/1000));
-        tblLocation.addView(header);
 
         TableRow row = getRow();
         ((TextView) row.findViewById(R.id.tv_1)).setText("Latitude");
         ((TextView) row.findViewById(R.id.tv_2)).setText(location.getLatitude() + "");
         ((TextView) row.findViewById(R.id.tv_3)).setText("Longitude");
         ((TextView) row.findViewById(R.id.tv_4)).setText(location.getLongitude() + "");
-        tblLocation.addView(row);
+        tblLocation.addView(row, 0);
         row = getRow();
         ((TextView) row.findViewById(R.id.tv_1)).setText("Altitude");
         ((TextView) row.findViewById(R.id.tv_2)).setText(location.getAltitude() + "");
         ((TextView) row.findViewById(R.id.tv_3)).setText("Accuracy");
         ((TextView) row.findViewById(R.id.tv_4)).setText(location.getAccuracy() + "");
-        tblLocation.addView(row);
+        tblLocation.addView(row, 0);
         row = getRow();
         ((TextView) row.findViewById(R.id.tv_1)).setText("Bearing");
         ((TextView) row.findViewById(R.id.tv_2)).setText(location.getBearing() + "");
         ((TextView) row.findViewById(R.id.tv_3)).setText("Speed");
         ((TextView) row.findViewById(R.id.tv_4)).setText(location.getSpeed() + "");
-        tblLocation.addView(row);
+        tblLocation.addView(row,0);
         row = getRow();
         ((TextView) row.findViewById(R.id.tv_1)).setText("Location Time");
         String dt = DateTimeUtil.formatDateTime(location.getTime()/1000);
         ((TextView) row.findViewById(R.id.tv_2)).setText(dt);
         ((TextView) row.findViewById(R.id.tv_3)).setText("Provider");
         ((TextView) row.findViewById(R.id.tv_4)).setText(location.getProvider());
-        tblLocation.addView(row);
+        tblLocation.addView(row,0);
         row = getRow();
         ((TextView) row.findViewById(R.id.tv_1)).setText("Elapsed Time");
         ((TextView) row.findViewById(R.id.tv_2)).setText(DateTimeUtil.formatDateTime(location.getElapsedRealtimeNanos()/1000000));
-        tblLocation.addView(row);
+        tblLocation.addView(row,0);
+
+        ((TextView) header.findViewById(R.id.tv_1)).setText("Location Received at " + DateTimeUtil.formatDateTime(location.getTime()/1000));
+        tblLocation.addView(header,0);
+
     }
 
     private TableRow getRow(){
         return (TableRow) getLayoutInflater().inflate(R.layout.row_4_cols, tblLocation, false);
+    }
+
+    public class LocationChangeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equalsIgnoreCase(LocationService.BROADCAST_ACTION_LOCATION_CHANGED)) {
+                Location location = intent.getParcelableExtra(LocationService.BROADCAST_EXTRA_LOCATION_DATA);
+                if (tvLocation != null && location != null) {
+                    Map<String, String> map = new HashMap<>();
+                    map.put("Provider", location.getProvider());
+                    map.put("Latitude", location.getLatitude() + "");
+                    map.put("Longitude", location.getLongitude() + "");
+                    map.put("Altitude", location.getAltitude() + "");
+                    map.put("Accuracy", location.getAccuracy() + "");
+                    map.put("Bearing", location.getBearing() + "");
+                    map.put("Speed", location.getSpeed() + "");
+                    map.put("Location Time", DateTimeUtil.formatDateTime(location.getTime()/1000));
+                    map.put("Elapsed Time", DateTimeUtil.formatDateTime(location.getElapsedRealtimeNanos()/1000000));
+                    tvLocation.setText(StaticUtils.toPrettyJson(map));
+                    try {
+                        showLocation(location);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        }
     }
 }

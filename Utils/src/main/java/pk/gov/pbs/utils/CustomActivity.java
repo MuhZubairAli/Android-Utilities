@@ -1,7 +1,11 @@
 package pk.gov.pbs.utils;
 
+import static pk.gov.pbs.utils.UXToolkit.CommonAlerts.showAlertAppPermissionsSetting;
+
 import android.Manifest;
 import android.app.AlertDialog;
+import android.app.NotificationManager;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -129,6 +133,25 @@ public abstract class CustomActivity extends AppCompatActivity {
         mFileManager = FileManager.getInstance(this);
 
         mPermissions.add(Manifest.permission.READ_PHONE_STATE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            mPermissions.add(Manifest.permission.POST_NOTIFICATIONS);
+            addSpecialPermission(Manifest.permission.POST_NOTIFICATIONS, "Notification permission is required in order to Show Notifications from foreground services", new PermissionRequest() {
+                @Override
+                public boolean hasPermission() {
+                    NotificationManager notificationManager =
+                            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                    return notificationManager.areNotificationsEnabled();
+                }
+
+                @Override
+                public void askPermission() {
+                    Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                    intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                    startActivity(intent);
+                }
+            });
+        }
+
         // Adding STORAGE_MANGER_PERMISSION request handler because FileManager utility is provided by default
         mPermissions.addAll(Arrays.asList(FileManager.getPermissionsRequired()));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
@@ -181,14 +204,21 @@ public abstract class CustomActivity extends AppCompatActivity {
 
                                     @Override
                                     public void onOK(DialogInterface dialog, int which) {
-                                        openAppSettingsActivity();
+                                        final Intent i = new Intent();
+                                        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                        i.addCategory(Intent.CATEGORY_DEFAULT);
+                                        i.setData(Uri.parse("package:" + getPackageName()));
+                                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                                        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+                                        startActivity(i);
                                     }
                                 });
                         } else {
                             if (permissions.size() == 1 && permissions.containsKey(Manifest.permission.MANAGE_EXTERNAL_STORAGE))
                                 requestSpecialPermissions();
                             else
-                                showAlertAppPermissionsSetting();
+                                showAlertAppPermissionsSetting(this);
                         }
                     } else if (deniedPermission.isEmpty() && !permissions.isEmpty()) {
                         requestSpecialPermissions();
@@ -393,49 +423,6 @@ public abstract class CustomActivity extends AppCompatActivity {
 
     public FileManager getFileManager(){
         return mFileManager;
-    }
-
-    private void openAppSettingsActivity() {
-        final Intent i = new Intent();
-        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-        i.addCategory(Intent.CATEGORY_DEFAULT);
-        i.setData(Uri.parse("package:" + getPackageName()));
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-        startActivity(i);
-    }
-
-    protected void showAlertAppPermissionsSetting(){
-        try {
-            if (!isDestroyed() && !isFinishing()) {
-                if(dialogAppSettings == null) {
-                    dialogAppSettings = mUXToolkit.buildConfirmDialogue(
-                            getString(R.string.alert_dialog_all_permissions_title)
-                            , getString(R.string.alert_dialog_all_permissions_message)
-                            , getString(R.string.label_btn_permissions_settings)
-                            , "Cancel"
-                            , new UXEventListeners.ConfirmDialogueEventsListener() {
-                                @Override
-                                public void onCancel(DialogInterface dialog, int which) {
-                                    dialogAppSettings.dismiss();
-                                }
-
-                                @Override
-                                public void onOK(DialogInterface dialog, int which) {
-                                    openAppSettingsActivity();
-                                }
-                            }
-
-                    );
-                }
-
-                if(!dialogAppSettings.isShowing())
-                    dialogAppSettings.show();
-            }
-        } catch (Exception e){
-            ExceptionReporter.handle(e);
-        }
     }
 
     protected class PermissionRequestHandler {

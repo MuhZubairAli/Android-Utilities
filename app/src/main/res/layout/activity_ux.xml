@@ -33,22 +33,44 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-        <Button
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:id="@+id/btnCreateFiles"
-            android:text="Create Files" />
 
         <Button
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/btnZipFiles"
-            android:text="Zip Files" />
+            android:text="Show Example Alert"
+            android:id="@+id/btnAlert" />
 
         <Button
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/btnUnzipFiles"
-            android:text="Unzip files" />
+            android:text="Show Example Confirm"
+            android:id="@+id/btnConfirm" />
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Preloader"
+            android:id="@+id/btnProgress" />
+
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show keyboard"
+            android:id="@+id/btnShowKB" />
+
+
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hide Keboard"
+            android:id="@+id/btnHideKB" />
+
+        <EditText
+            android:id="@+id/etText"
+            android:hint="Enter Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
     </LinearLayout>
 </ScrollView>
