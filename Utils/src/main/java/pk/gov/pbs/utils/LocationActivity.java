@@ -48,7 +48,7 @@ public abstract class LocationActivity extends CustomActivity {
         super.onPostResume();
         if (mLocationService != null) {
             if (!mLocationService.isNetworkEnabled() && !mLocationService.isGPSEnabled())
-                showAlertLocationSettings(this);
+                showAlertLocationSettings(getUXToolkit());
         }
     }
 
@@ -124,7 +124,7 @@ public abstract class LocationActivity extends CustomActivity {
                     mLocationService = binder.getService();
                     binder.setLocationChangeCallbacks(mLocationChangeCallbacks);
                     if (!mLocationService.isNetworkEnabled() && !mLocationService.isGPSEnabled())
-                        showAlertLocationSettings(LocationActivity.this);
+                        showAlertLocationSettings(LocationActivity.this.getUXToolkit());
 
                     if (mAfterLocationServiceStartCallback != null)
                         mAfterLocationServiceStartCallback.run();
@@ -252,7 +252,7 @@ public abstract class LocationActivity extends CustomActivity {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(LocationService.BROADCAST_ACTION_PROVIDER_DISABLED)) {
-                showAlertLocationSettings(context);
+                showAlertLocationSettings(new UXToolkit(context));
             }
         }
     }

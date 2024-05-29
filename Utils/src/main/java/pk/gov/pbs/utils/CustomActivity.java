@@ -47,8 +47,6 @@ public abstract class CustomActivity extends AppCompatActivity {
                     | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
 
     private ActionBar actionBar;
-    private AlertDialog dialogAppSettings;
-
     private final List<String> mPermissions = new ArrayList<>();
     private final Map<String, PermissionRequestHandler> mSpecialPermissionsHandlers = new HashMap<>(2);
     private final Stack<PermissionRequestHandler> mSpecialPermissions = new Stack<>();
@@ -196,7 +194,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                                 , "All requested permissions are required to work properly, Kindly grant all the requested permissions"
                                 , "Open Permissions Settings"
                                 , "Request Again"
-                                , new UXEventListeners.ConfirmDialogueEventsListener() {
+                                , new UXEvent.ConfirmDialogue() {
                                     @Override
                                     public void onCancel(DialogInterface dialog, int which) {
                                         requestPermissions(deniedPermission.toArray(new String[0]));
@@ -218,7 +216,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                             if (permissions.size() == 1 && permissions.containsKey(Manifest.permission.MANAGE_EXTERNAL_STORAGE))
                                 requestSpecialPermissions();
                             else
-                                showAlertAppPermissionsSetting(this);
+                                showAlertAppPermissionsSetting(getUXToolkit());
                         }
                     } else if (deniedPermission.isEmpty() && !permissions.isEmpty()) {
                         requestSpecialPermissions();
@@ -452,7 +450,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                     , permissionRequestStatement
                     , "Proceed"
                     , "Cancel"
-                    , new UXEventListeners.ConfirmDialogueEventsListener() {
+                    , new UXEvent.ConfirmDialogue() {
                         @Override
                         public void onCancel(DialogInterface dialog, int which) {
                             status = PermissionRequestStatus.DENIED;

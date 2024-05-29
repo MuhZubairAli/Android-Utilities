@@ -13,133 +13,263 @@ import android.text.Html;
 import android.text.Spanned;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import java.lang.ref.WeakReference;
 
 /**
  * Todo: add functionality to add buttons to progress dialog (i,e for location ProgressDialog after some time show button to use last location)
  */
 
 public class UXToolkit {
-    protected final CustomActivity context;
-    protected final LayoutInflater mLayoutInflater;
     protected final InputMethodManager mInputMethodManager;
     protected AlertDialog.Builder mDialogBuilder;
-    protected ProgressDialog progressDialog;
+    protected ProgressDialog mProgressDialog;
 
-    public UXToolkit(CustomActivity _context){
-        context = _context;
-        mInputMethodManager = (InputMethodManager) context.getSystemService(Activity.INPUT_METHOD_SERVICE);
-        mLayoutInflater = LayoutInflater.from(context);
+    public UXToolkit(Context activityContext){
+        mInputMethodManager = (InputMethodManager) activityContext.getSystemService(Activity.INPUT_METHOD_SERVICE);
+        mDialogBuilder = getDialogBuilder(activityContext);
+    }
+    private AlertDialog.Builder getDialogBuilder(Context context, int theme){
+        return  (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) ?
+                new AlertDialog.Builder(context) :
+                new AlertDialog.Builder(
+                        context, theme
+                );
     }
 
-    public CustomActivity getContext(){
-        return context;
+    private AlertDialog.Builder getDialogBuilder(Context context){
+        return getDialogBuilder(context, R.style.AlertDialogTheme);
     }
 
-    public AlertDialog.Builder getDialogBuilder(){
-        if(mDialogBuilder == null) {
-            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP)
-                mDialogBuilder = new AlertDialog.Builder(context);
-            else
-                mDialogBuilder = new AlertDialog.Builder(context, R.style.AlertDialogTheme);
-        }
+    public AlertDialog.Builder getDialogBuilder() {
         return mDialogBuilder;
     }
 
-    private View inflateInfoAlertDialogue(String title, String message){
-        Spanned htm = Html.fromHtml(message);
-        View dlg = mLayoutInflater.inflate(R.layout.custom_dialogue_alert,null);
-        ((TextView) dlg.findViewById(R.id.tv_title)).setText(title);
-        ((TextView) dlg.findViewById(R.id.tv_message)).setText(htm);
-        return dlg;
+    private View inflateDefaultDialogue(String title, String message) throws Exception {
+        return inflateDefaultDialogue(title, message, R.layout.custom_dialogue_alert);
     }
 
-    public void hideKeyboardFrom(View view) {
-        if (view == null)
-            view = context.getWindow().getCurrentFocus();
-        if (view == null) {
-            view = new View(context);
-            view.setFocusable(true);
-            view.requestFocus();
-        }
-        mInputMethodManager.hideSoftInputFromWindow(view.getWindowToken(), 0);
-
-    }
-
-    public void showKeyboardTo(View view) {
-        if (view == null)
-            view = context.getCurrentFocus();
-        if (view == null) {
-            view = new View(context);
-            view.setFocusable(true);
-            view.requestFocus();
-        }
-        mInputMethodManager.showSoftInput(view, 0);
-    }
-
-    public AlertDialog buildAlertDialogue(String title, String message,@Nullable String positiveButtonLabel,@Nullable UXEventListeners.AlertDialogueEventListener callback){
-        AlertDialog alertDialog;
-        if(positiveButtonLabel == null)
-            positiveButtonLabel = context.getResources().getString(R.string.label_btn_ok);
-
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
+    private View inflateDefaultDialogue(String title, String message, int resourceLayout) throws Exception {
+        if (mDialogBuilder != null) {
             Spanned htm = Html.fromHtml(message);
-            alertDialog = getDialogBuilder()
-                    .setTitle(title)
-                    .setMessage(htm)
-                    .setCancelable(false)
-                    .setPositiveButton(
-                            positiveButtonLabel
-                            , (dialog, which) -> {
-                                if(callback != null)
-                                    callback.onOK(dialog, which);
-                            }
-                    )
-                    .create();
-        } else {
-            alertDialog = getDialogBuilder()
-                    .setView(inflateInfoAlertDialogue(title, message))
-                    .setCancelable(false)
-                    .setPositiveButton(
-                            positiveButtonLabel
-                            , (dialog, which) -> {
-                                if(callback != null)
-                                    callback.onOK(dialog, which);
-                            }
-                    )
-                    .create();
-        }
-        return alertDialog;
+            View defaultDialog = LayoutInflater.from(mDialogBuilder.getContext())
+                    .inflate(resourceLayout, null);
+            ((TextView) defaultDialog.findViewById(R.id.tv_title)).setText(title);
+            ((TextView) defaultDialog.findViewById(R.id.tv_message)).setText(htm);
+            return defaultDialog;
+        } else
+            throw new Exception("Dialog builder is null, can not use LayoutInflater");
     }
 
-    public AlertDialog buildConfirmDialogue(String title, String message, @Nullable String positiveBtnLabel, @Nullable String negativeBtnLabel, UXEventListeners.ConfirmDialogueEventsListener events) {
-        if (positiveBtnLabel == null)
-            positiveBtnLabel = context.getResources().getString(R.string.label_btn_ok);
-        if (negativeBtnLabel == null)
-            negativeBtnLabel = "Cancel";
+    private View getFocusedView(@NonNull View view) {
+        View focusedView;
+        if (!view.hasFocus()) {
+            if (view.isFocusable() && view.requestFocus()){
+                focusedView = view;
+            } else {
+                focusedView = view.findFocus();
+            }
+            if (!focusedView.hasFocus()){
+                view.setFocusable(true);
+                view.setFocusableInTouchMode(true);
+                view.requestFocus();
+                focusedView = view;
+            }
+        } else
+            focusedView = view;
+        return focusedView;
+    }
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            try {
+    public boolean hideKeyboardFrom(View view) {
+        View focusedView = getFocusedView(view);
+        return mInputMethodManager.hideSoftInputFromWindow(
+                focusedView.getWindowToken(), 0
+        );
+    }
+
+    public boolean showKeyboardTo(View view) {
+        View focusedView = getFocusedView(view);
+        return mInputMethodManager.showSoftInput(focusedView, 0);
+    }
+
+    public AlertDialog.Builder getDialogueBuilder(int contentView){
+        return getDialogueBuilder(contentView, true);
+    }
+
+    public AlertDialog.Builder getDialogueBuilder(int contentView, boolean cancelable) {
+        return getDialogBuilder()
+                .setView(contentView)
+                .setCancelable(cancelable);
+    }
+
+    public AlertDialog.Builder getDialogueBuilder(View contentView) {
+        return getDialogueBuilder(contentView, true);
+    }
+
+    public AlertDialog.Builder getDialogueBuilder(View contentView, boolean cancelable){
+        return getDialogBuilder()
+                .setView(contentView)
+                .setCancelable(cancelable);
+    }
+
+    public AlertDialog buildAlertDialogue(
+            String title,
+            String message,
+            String btnLabel,
+            UXEvent.AlertDialogue callback
+    ) {
+        try {
+            if (mDialogBuilder == null)
+                throw new IllegalStateException("Dialog builder is null, can not proceed to build AlertDialog");
+
+            AlertDialog alertDialog;
+            if (btnLabel == null)
+                btnLabel = mDialogBuilder
+                        .getContext()
+                        .getResources()
+                        .getString(R.string.label_btn_ok);
+
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
                 Spanned htm = Html.fromHtml(message);
-                return getDialogBuilder()
+                alertDialog = getDialogBuilder()
+                        .setTitle(title)
+                        .setMessage(htm)
+                        .setCancelable(false)
+                        .setPositiveButton(
+                                btnLabel
+                                , (dialog, which) -> {
+                                    if (callback != null)
+                                        callback.onOK(dialog, which);
+                                    else
+                                        dialog.dismiss();
+                                }
+                        )
+                        .create();
+            } else {
+                alertDialog = getDialogBuilder()
+                        .setView(inflateDefaultDialogue(title, message))
+                        .setCancelable(false)
+                        .setPositiveButton(
+                                btnLabel
+                                , (dialog, which) -> {
+                                    if (callback != null)
+                                        callback.onOK(dialog, which);
+                                }
+                        )
+                        .create();
+            }
+            return alertDialog;
+        } catch (Exception e){
+            ExceptionReporter.handle(e);
+            return null;
+        }
+    }
+
+    public void showAlertDialogue(String title, String message, String btnLabel, UXEvent.AlertDialogue event){
+        buildAlertDialogue(title, message, btnLabel, event).show();
+    }
+
+    public void showAlertDialogue(int title, int message, int btnLabel, UXEvent.AlertDialogue event){
+        buildAlertDialogue(
+                mDialogBuilder.getContext().getString(title),
+                mDialogBuilder.getContext().getString(message),
+                mDialogBuilder.getContext().getString(btnLabel),
+                event
+        ).show();
+    }
+
+    public void showAlertDialogue(String title, String message, UXEvent.AlertDialogue event){
+        buildAlertDialogue(title, message, null, event).show();
+    }
+
+    public void showAlertDialogue(int title, int message, UXEvent.AlertDialogue event){
+        buildAlertDialogue(
+                mDialogBuilder.getContext().getString(title),
+                mDialogBuilder.getContext().getString(message),
+                null, event
+        ).show();
+    }
+
+    public void showAlertDialogue(String title, String message){
+        showAlertDialogue(title,message,null, null);
+    }
+
+    public void showAlertDialogue(int title, int message){
+        showAlertDialogue(
+                mDialogBuilder.getContext().getString(title),
+                mDialogBuilder.getContext().getString(message),
+                null, null);
+    }
+
+    public void showAlertDialogue(String message, UXEvent.AlertDialogue event){
+        showAlertDialogue(
+                mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue)
+                , message, null, event);
+    }
+
+    public void showAlertDialogue(int message, UXEvent.AlertDialogue event){
+        showAlertDialogue(
+                mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue),
+                mDialogBuilder.getContext().getString(message),
+                null, event);
+    }
+
+    public void showAlertDialogue(String message){
+        showAlertDialogue(
+                mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue),
+                message, null, null);
+    }
+
+    public void showAlertDialogue(int message){
+        showAlertDialogue(
+                mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue),
+                mDialogBuilder.getContext().getString(message),
+                null, null);
+    }
+
+    public AlertDialog buildConfirmDialogue(
+            String title,
+            String message,
+            String positiveBtnLabel,
+            String negativeBtnLabel,
+            UXEvent.ConfirmDialogue events
+    ) {
+        try {
+            if (mDialogBuilder == null)
+                throw new IllegalStateException("Dialog builder is null, can not proceed to build AlertDialog");
+
+            AlertDialog confirmDialog;
+
+            if (positiveBtnLabel == null)
+                positiveBtnLabel = mDialogBuilder
+                        .getContext()
+                        .getResources()
+                        .getString(R.string.label_btn_ok);
+
+            if (negativeBtnLabel == null)
+                negativeBtnLabel = mDialogBuilder
+                        .getContext()
+                        .getResources()
+                        .getString(R.string.label_btn_cancel);
+
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+                Spanned htm = Html.fromHtml(message);
+                confirmDialog = getDialogBuilder()
                         .setTitle(title)
                         .setMessage(htm)
                         .setCancelable(false)
                         .setPositiveButton(positiveBtnLabel, events::onOK)
                         .setNegativeButton(negativeBtnLabel, events::onCancel)
                         .create();
-            } catch (Exception e) {
-                ExceptionReporter.handle(e);
-            }
-        } else {
-            try {
-                return getDialogBuilder()
-                        .setView(inflateInfoAlertDialogue(title, message))
+            } else {
+                confirmDialog = getDialogBuilder()
+                        .setView(inflateDefaultDialogue(title, message))
                         .setCancelable(false)
                         .setPositiveButton(
                                 positiveBtnLabel
@@ -148,309 +278,119 @@ public class UXToolkit {
                                 negativeBtnLabel
                                 , events::onCancel)
                         .create();
-            } catch (Exception e) {
-                ExceptionReporter.handle(e);
             }
+            return confirmDialog;
+        } catch (Exception e){
+            ExceptionReporter.handle(e);
+            return null;
         }
-        return null;
     }
 
-    public AlertDialog showAlertDialogue(String title, String message, String positiveButtonLabel, @Nullable UXEventListeners.AlertDialogueEventListener event){
-        AlertDialog dialog = buildAlertDialogue(title, message, positiveButtonLabel, event);
-        dialog.show();
+    public void showConfirmDialogue(String title, String message, String labelBtnPositive, String labelBtnNegative, UXEvent.ConfirmDialogue events){
+        buildConfirmDialogue(title, message, labelBtnPositive, labelBtnNegative, events).show();
+    }
+
+    public void showConfirmDialogue(int title, int message, String labelBtnPositive, String labelBtnNegative, UXEvent.ConfirmDialogue events){
+        buildConfirmDialogue(
+                mDialogBuilder.getContext().getString(title),
+                mDialogBuilder.getContext().getString(message),
+                labelBtnPositive, labelBtnNegative, events)
+                .show();
+    }
+
+    public void showConfirmDialogue(String title, String message, UXEvent.ConfirmDialogue events){
+        buildConfirmDialogue(title, message, null, null, events).show();
+    }
+
+    public void showConfirmDialogue(int title, int message, UXEvent.ConfirmDialogue events){
+        buildConfirmDialogue(
+                mDialogBuilder.getContext().getString(title),
+                mDialogBuilder.getContext().getString(message)
+                , null, null, events)
+                .show();
+    }
+
+    public void showConfirmDialogue(String message, UXEvent.ConfirmDialogue events){
+        buildConfirmDialogue(
+                mDialogBuilder.getContext().getString(R.string.title_default_confirm_dialogue),
+                message, null, null, events).
+                show();
+    }
+
+    public void showConfirmDialogue(int message, UXEvent.ConfirmDialogue events){
+        buildConfirmDialogue(
+                mDialogBuilder.getContext().getString(R.string.title_default_confirm_dialogue),
+                mDialogBuilder.getContext().getString(message)
+                , null, null, events)
+                .show();
+    }
+
+    public ProgressDialog buildProgressDialogue(
+            String title,
+            String message,
+            DialogInterface.OnCancelListener cancelListener
+    ) {
+        ProgressDialog dialog = new ProgressDialog(mDialogBuilder.getContext());
+        if (title == null)
+            title = mDialogBuilder.getContext().getString(R.string.title_default_progress_dialogue);
+        dialog.setTitle(title);
+        if (message != null)
+            dialog.setMessage(message);
+        if (cancelListener != null)
+            dialog.setOnCancelListener(cancelListener);
         return dialog;
     }
 
-    public AlertDialog showAlertDialogue(String title, String message, @Nullable UXEventListeners.AlertDialogueEventListener event){
-        return showAlertDialogue(title, message, null, event);
+    public ProgressDialog buildProgressDialogue(String title, String message) {
+        return buildProgressDialogue(title, message, null);
     }
 
-    public AlertDialog showAlertDialogue(int title, int message, UXEventListeners.AlertDialogueEventListener event){
-        return showAlertDialogue(context.getString(title), context.getString(message), event);
+    public ProgressDialog buildProgressDialogue(String title) {
+        return buildProgressDialogue(title, null, null);
     }
 
-    public AlertDialog showAlertDialogue(String title, String message){
-        return showAlertDialogue(title,message,null);
+    public void showProgressDialogue(String title){
+        mProgressDialog = buildProgressDialogue(title);
+        mProgressDialog.show();
     }
 
-    public AlertDialog showAlertDialogue(int title, int message){
-        return showAlertDialogue(context.getString(title), context.getString(message), null);
-    }
-
-    public AlertDialog showAlertDialogue(String message, UXEventListeners.AlertDialogueEventListener event){
-        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), message, event);
-    }
-
-    public AlertDialog showAlertDialogue(int message, UXEventListeners.AlertDialogueEventListener event){
-        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), context.getString(message), event);
-    }
-
-    public AlertDialog showAlertDialogue(String message){
-        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), message, null);
-    }
-
-    public AlertDialog showAlertDialogue(int message){
-        return showAlertDialogue(context.getString(R.string.title_default_alert_dialogue), context.getString(message), null);
-    }
-
-    public AlertDialog showConfirmDialogue(String title, String message, String positiveBtnLabel, String negativeBtnLabel, UXEventListeners.ConfirmDialogueEventsListener events){
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
-            try {
-                Spanned htm = Html.fromHtml(message);
-                AlertDialog dialog = getDialogBuilder()
-                        .setTitle(title)
-                        .setMessage(htm)
-                        .setCancelable(false)
-                        .setPositiveButton(positiveBtnLabel, events::onOK)
-                        .setNegativeButton(negativeBtnLabel, events::onCancel)
-                        .create();
-
-                dialog.show();
-                return dialog;
-            } catch (Exception e){
-                ExceptionReporter.handle(e);
-            }
-        } else {
-            try {
-                AlertDialog alert = getDialogBuilder()
-                        .setView(inflateInfoAlertDialogue(title, message))
-                        .setCancelable(false)
-                        .setPositiveButton(positiveBtnLabel, events::onOK)
-                        .setNegativeButton(negativeBtnLabel, events::onCancel)
-                        .create();
-                alert.show();
-                return alert;
-            } catch (Exception e) {
-                ExceptionReporter.handle(e);
-            }
-        }
-        return null;
-    }
-
-    public AlertDialog showConfirmDialogue(String title, String message, UXEventListeners.ConfirmDialogueEventsListener events){
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
-            try {
-                Spanned htm = Html.fromHtml(message);
-                AlertDialog dialog = getDialogBuilder()
-                        .setTitle(title)
-                        .setMessage(htm)
-                        .setCancelable(false)
-                        .setPositiveButton(R.string.label_btn_ok, events::onOK)
-                        .setNegativeButton(R.string.label_btn_cancel, events::onCancel)
-                        .create();
-
-                dialog.show();
-                return dialog;
-            } catch (Exception e){
-                ExceptionReporter.handle(e);
-            }
-        } else {
-            try {
-                AlertDialog alert = getDialogBuilder()
-                        .setView(inflateInfoAlertDialogue(title, message))
-                        .setCancelable(false)
-                        .setPositiveButton(
-                                R.string.label_btn_ok
-                                , events::onOK)
-                        .setNegativeButton(
-                                context
-                                        .getResources()
-                                        .getString(R.string.label_btn_cancel)
-                                , events::onCancel)
-                        .create();
-                alert.show();
-                return alert;
-            } catch (Exception e) {
-                ExceptionReporter.handle(e);
-            }
-        }
-        return null;
-    }
-
-    public AlertDialog showConfirmDialogue(String message, UXEventListeners.ConfirmDialogueEventsListener events){
-        return showConfirmDialogue(context.getString(R.string.title_default_confirm_dialogue),message,events);
-    }
-
-    public AlertDialog showConfirmDialogue(int message, UXEventListeners.ConfirmDialogueEventsListener events){
-        return showConfirmDialogue(context.getString(R.string.title_default_confirm_dialogue),context.getString(message),events);
-    }
-
-    public AlertDialog showConfirmDialogue(int title, int message, UXEventListeners.ConfirmDialogueEventsListener events){
-        return showConfirmDialogue(context.getString(title),context.getString(message),events);
-    }
-
-    public ProgressDialog changeProgressDialogueMessage(String message){
-        synchronized (this) {
-            if (progressDialog != null)
-                progressDialog.setMessage(message);
-        }
-        return progressDialog;
-    }
-
-    public ProgressDialog showProgressDialogue(String message, boolean cancelable){
-        synchronized (this) {
-            if (progressDialog == null) {
-                progressDialog = new ProgressDialog(context);
-                progressDialog.setMessage(message);
-            } else
-                changeProgressDialogueMessage(message);
-            showProgressDialogue(cancelable);
-        }
-        return progressDialog;
-    }
-
-    public ProgressDialog showProgressDialogue(String message){
-        return showProgressDialogue(message, false);
-    }
-
-    public ProgressDialog showProgressDialogue(int stringResource, boolean cancelable){
-        return showProgressDialogue(context.getResources().getString(stringResource), cancelable);
-    }
-
-    public ProgressDialog showProgressDialogue(int stringResource){
-        return showProgressDialogue(stringResource, false);
+    public void showProgressDialogue(){
+        if(mProgressDialog != null)
+            dismissProgressDialogue();
+        mProgressDialog = buildProgressDialogue(null);
+        mProgressDialog.show();
     }
 
     public void dismissProgressDialogue(){
-        synchronized (this) {
-            if (progressDialog != null) {
-                if (progressDialog.isShowing())
-                    progressDialog.dismiss();
-                progressDialog = null;
-            }
-        }
+        if(mProgressDialog != null && mProgressDialog.isShowing())
+            mProgressDialog.dismiss();
+        mProgressDialog = null;
     }
-
-    public ProgressDialog showProgressDialogue(){
-        return showProgressDialogue(false);
-    }
-
-    private ProgressDialog showProgressDialogue(boolean cancelable){
-        if(!progressDialog.isShowing()) {
-            progressDialog.setCancelable(cancelable);
-            progressDialog.show();
-        }
-        return progressDialog;
-    }
-
     public void showToast(String message){
-        synchronized (this) {
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show();
-        }
+        Toast.makeText(mDialogBuilder.getContext(), message, Toast.LENGTH_LONG).show();
     }
 
     public void showToast(int stringResource){
-        synchronized (this) {
-            Toast.makeText(context, context.getResources().getString(stringResource), Toast.LENGTH_LONG).show();
-        }
+        Toast.makeText(mDialogBuilder.getContext(), stringResource, Toast.LENGTH_LONG).show();
     }
 
     public void showToast(Spanned htm) {
-        synchronized (this) {
-            Toast.makeText(context, htm, Toast.LENGTH_LONG).show();
-        }
+        Toast.makeText(mDialogBuilder.getContext(), htm, Toast.LENGTH_LONG).show();
     }
 
     public static final class CommonAlerts {
         private static AlertDialog dialogLocationSettings;
         private static AlertDialog dialogAppSettings;
-        private static AlertDialog.Builder getDialogBuilder(Context context){
-            return (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) ?
-                    new AlertDialog.Builder(context):
-                    new AlertDialog.Builder(context, R.style.AlertDialogTheme);
-        }
 
-        private static View inflateInfoAlertDialogue(Context context, String title, String message){
-            Spanned htm = Html.fromHtml(message);
-            View dlg = LayoutInflater.from(context).inflate(R.layout.custom_dialogue_alert,null);
-            ((TextView) dlg.findViewById(R.id.tv_title)).setText(title);
-            ((TextView) dlg.findViewById(R.id.tv_message)).setText(htm);
-            return dlg;
-        }
-
-        private static AlertDialog buildAlertDialogue(Context context, String title, String message, @Nullable String positiveButtonLabel, @Nullable UXEventListeners.AlertDialogueEventListener callback){
-            AlertDialog alertDialog;
-            if(positiveButtonLabel == null)
-                positiveButtonLabel = context.getResources().getString(R.string.label_btn_ok);
-
-            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP){
-                Spanned htm = Html.fromHtml(message);
-                alertDialog = getDialogBuilder(context)
-                        .setTitle(title)
-                        .setMessage(htm)
-                        .setCancelable(false)
-                        .setPositiveButton(
-                                positiveButtonLabel
-                                , (dialog, which) -> {
-                                    if(callback != null)
-                                        callback.onOK(dialog, which);
-                                }
-                        )
-                        .create();
-            } else {
-                alertDialog = getDialogBuilder(context)
-                        .setView(inflateInfoAlertDialogue(context, title, message))
-                        .setCancelable(false)
-                        .setPositiveButton(
-                                positiveButtonLabel
-                                , (dialog, which) -> {
-                                    if(callback != null)
-                                        callback.onOK(dialog, which);
-                                }
-                        )
-                        .create();
-            }
-            return alertDialog;
-        }
-
-        public static AlertDialog buildConfirmDialogue(Context context, String title, String message, @Nullable String positiveBtnLabel, @Nullable String negativeBtnLabel, UXEventListeners.ConfirmDialogueEventsListener events) {
-            if (positiveBtnLabel == null)
-                positiveBtnLabel = context.getResources().getString(R.string.label_btn_ok);
-            if (negativeBtnLabel == null)
-                negativeBtnLabel = "Cancel";
-
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-                try {
-                    Spanned htm = Html.fromHtml(message);
-                    return getDialogBuilder(context)
-                            .setTitle(title)
-                            .setMessage(htm)
-                            .setCancelable(false)
-                            .setPositiveButton(positiveBtnLabel, events::onOK)
-                            .setNegativeButton(negativeBtnLabel, events::onCancel)
-                            .create();
-                } catch (Exception e) {
-                    ExceptionReporter.handle(e);
-                }
-            } else {
-                try {
-                    return getDialogBuilder(context)
-                            .setView(inflateInfoAlertDialogue(context, title, message))
-                            .setCancelable(false)
-                            .setPositiveButton(
-                                    positiveBtnLabel
-                                    , events::onOK)
-                            .setNegativeButton(
-                                    negativeBtnLabel
-                                    , events::onCancel)
-                            .create();
-                } catch (Exception e) {
-                    ExceptionReporter.handle(e);
-                }
-            }
-            return null;
-        }
-
-        public static void showAlertLocationSettings(Context context){
+        public static void showAlertLocationSettings(UXToolkit toolkit){
             if(dialogLocationSettings == null) {
-                dialogLocationSettings = buildAlertDialogue(
-                        context
-                        ,context.getString(R.string.alert_dialog_gps_title)
-                        ,context.getString(R.string.alert_dialog_gps_message)
-                        ,context.getString(R.string.label_btn_location_settings)
+                dialogLocationSettings = toolkit.buildAlertDialogue(
+                        toolkit.mDialogBuilder.getContext().getString(R.string.alert_dialog_gps_title)
+                        ,toolkit.mDialogBuilder.getContext().getString(R.string.alert_dialog_gps_message)
+                        ,toolkit.mDialogBuilder.getContext().getString(R.string.label_btn_location_settings)
                         , (dialog, which) -> {
                             Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                            context.startActivity(intent);
+                            toolkit.mDialogBuilder.getContext().startActivity(intent);
                         }
                 );
             }
@@ -459,15 +399,14 @@ public class UXToolkit {
                 dialogLocationSettings.show();
         }
 
-        public static void showAlertAppPermissionsSetting(Context context){
+        public static void showAlertAppPermissionsSetting(UXToolkit toolkit){
             if(dialogAppSettings == null) {
-                dialogAppSettings = buildConfirmDialogue(
-                        context
-                        , context.getString(R.string.alert_dialog_all_permissions_title)
-                        , context.getString(R.string.alert_dialog_all_permissions_message)
-                        , context.getString(R.string.label_btn_permissions_settings)
+                dialogAppSettings = toolkit.buildConfirmDialogue(
+                         toolkit.mProgressDialog.getContext().getString(R.string.alert_dialog_all_permissions_title)
+                        , toolkit.mDialogBuilder.getContext().getString(R.string.alert_dialog_all_permissions_message)
+                        , toolkit.mDialogBuilder.getContext().getString(R.string.label_btn_permissions_settings)
                         , "Cancel"
-                        , new UXEventListeners.ConfirmDialogueEventsListener() {
+                        , new UXEvent.ConfirmDialogue() {
                             @Override
                             public void onCancel(DialogInterface dialog, int which) {
                                 dialogAppSettings.dismiss();
@@ -478,11 +417,11 @@ public class UXToolkit {
                                 final Intent i = new Intent();
                                 i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                                 i.addCategory(Intent.CATEGORY_DEFAULT);
-                                i.setData(Uri.parse("package:" + context.getPackageName()));
+                                i.setData(Uri.parse("package:" + toolkit.mDialogBuilder.getContext().getPackageName()));
                                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
                                 i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-                                context.startActivity(i);
+                                toolkit.mDialogBuilder.getContext().startActivity(i);
                             }
                         }
 

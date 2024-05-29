@@ -96,7 +96,7 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
         });
 
         findViewById(R.id.btnLocSettings).setOnClickListener((v) -> {
-            showAlertLocationSettings(this);
+            showAlertLocationSettings(getUXToolkit());
         });
 
         findViewById(R.id.btnLastKnown).setOnClickListener((v) -> {
