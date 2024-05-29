@@ -751,17 +751,18 @@ public class FileManager {
             File extractTo = new File(
                     file.getParentFile(), outputDirectoryName.replaceAll("\\.[^\\.]+$", "")
             );
-            if (!extractTo.exists() && extractTo.mkdirs())
+            if (!extractTo.exists() && !extractTo.mkdirs())
                 throw new IOException("Failed to create directory '"+extractTo.getAbsolutePath()+"'");
 
             int entryCount = 0;
             while ((entry = zipIn.getNextEntry()) != null) {
                 String entryName = entry.getName();
                 String outputPath = extractTo + File.separator + entryName;
-                if (!entry.isDirectory() && !new File(outputPath).mkdirs()) {
+                File outputFile = new File(outputPath);
+                if (entry.isDirectory() && !outputFile.exists() && !outputFile.mkdirs()) {
                     throw new IOException("Failed to create directory '"+entry.getName()+"'");
-                } else {
-                    FileOutputStream fos = new FileOutputStream(outputPath);
+                } else if (!entry.isDirectory()){
+                    FileOutputStream fos = new FileOutputStream(outputFile);
                     byte[] buffer = new byte[1024];
                     int bytesRead;
                     while ((bytesRead = zipIn.read(buffer)) != -1) {
