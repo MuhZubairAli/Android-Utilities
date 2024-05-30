@@ -10,7 +10,6 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -27,7 +26,6 @@ import java.util.Map;
 import pk.gov.pbs.utils.DateTimeUtil;
 import pk.gov.pbs.utils.ExceptionReporter;
 import pk.gov.pbs.utils.StaticUtils;
-import pk.gov.pbs.utils.location.ILocationChangeCallback;
 import pk.gov.pbs.utils.location.LocationService;
 
 public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
@@ -76,7 +74,7 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
                 mUXToolkit.showToast("Location service not started!");
                 return;
             }
-            getLocationService().pauseLocationUpdates();
+            getLocationService().setModeIdle();
         });
 
         findViewById(R.id.btnResume).setOnClickListener((v) -> {

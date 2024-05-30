@@ -2,7 +2,6 @@ package pk.gov.pbs.utils.location;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -27,11 +26,7 @@ import androidx.core.app.NotificationManagerCompat;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
-import java.util.Queue;
-import java.util.WeakHashMap;
 
 import pk.gov.pbs.utils.Constants;
 import pk.gov.pbs.utils.DateTimeUtil;
@@ -39,7 +34,6 @@ import pk.gov.pbs.utils.ExceptionReporter;
 import pk.gov.pbs.utils.R;
 import pk.gov.pbs.utils.StaticUtils;
 import pk.gov.pbs.utils.SystemUtils;
-import pk.gov.pbs.utils.exceptions.InvalidIndexException;
 
 public class LocationService extends Service {
     private static final String TAG = ":Utils] LocationService";
@@ -51,6 +45,8 @@ public class LocationService extends Service {
             LocationService.class.getCanonicalName()+".CurrentLocation";
     public static final String BROADCAST_EXTRA_NOTIFICATION_INTENT =
             LocationService.class.getCanonicalName()+".SrvPndIntent";
+    public static final String BROADCAST_EXTRA_SERVICE_MODE =
+            LocationService.class.getCanonicalName()+".SrvMode";
     public static final int PERMISSION_REQUEST_CODE = 10;
     private static final int SERVICE_NOTIFICATION_ID = 1;
     private static LocationService instance;
@@ -63,6 +59,7 @@ public class LocationService extends Service {
     protected LocationListener mLocationListener;
     private final String notificationTitle = "Location Service";
     private PendingIntent mNotificationIntent;
+    private Mode mServiceMode;
 
     public static String[] getPermissionsRequired(){
         return new String[]{
@@ -137,12 +134,14 @@ public class LocationService extends Service {
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "onStartCommand: Location service started");
 
+
+
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, Constants.Notification_Channel_ID)
                 .setContentTitle(notificationTitle)
                 .setContentText("Finding device location...")
                 .setSmallIcon(R.drawable.ic_auto_mode);
 
-        Bundle bundle;
+        Bundle bundle = null;
         if (intent != null && (bundle = intent.getExtras()) != null && bundle.containsKey(BROADCAST_EXTRA_NOTIFICATION_INTENT)){
             mNotificationIntent = bundle.getParcelable(BROADCAST_EXTRA_NOTIFICATION_INTENT);
             if (mNotificationIntent != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -152,9 +151,13 @@ public class LocationService extends Service {
         }
 
         startForeground(SERVICE_NOTIFICATION_ID, notification.build());
-        if(!requestLocationUpdates())
-            ExceptionReporter.handle(new Exception("Failed to request location updates"));
 
+        if (bundle != null && bundle.containsKey(LocationService.BROADCAST_EXTRA_SERVICE_MODE)){
+            Mode mode = (Mode) bundle.getSerializable(LocationService.BROADCAST_EXTRA_SERVICE_MODE);
+            setMode(mode);
+        } else {
+            setModeActive();
+        }
         return START_STICKY;
     }
 
@@ -163,16 +166,6 @@ public class LocationService extends Service {
         super.onDestroy();
         mLocationManager.removeUpdates(mLocationListener);
         instance = null;
-    }
-
-    public static void pause(){
-        if (isRunning())
-            getInstance().pauseLocationUpdates();
-    }
-
-    public static void resume(){
-        if (isRunning())
-            getInstance().resumeLocationUpdates();
     }
 
     public static void stop(Context context){
@@ -207,6 +200,7 @@ public class LocationService extends Service {
                                 PendingIntent.FLAG_IMMUTABLE
                         )
                 );
+                bundle.putSerializable(LocationService.BROADCAST_EXTRA_SERVICE_MODE, Mode.IDLE);
                 intent.putExtras(bundle);
             }
 
@@ -221,7 +215,8 @@ public class LocationService extends Service {
     protected boolean requestLocationUpdates() {
         if (Constants.DEBUG_MODE)
             Log.d(TAG, "requestLocationUpdates]: requesting location updates");
-
+        List<String> providers = mLocationManager.getAllProviders();
+        List<String> enabled = mLocationManager.getProviders(true);
         if (hasRequiredPermissions(this)) {
             if (isGPSEnabled() || isNetworkEnabled()) {
                 if (isNetworkEnabled()) {
@@ -247,15 +242,48 @@ public class LocationService extends Service {
         return false;
     }
 
-    public void resumeLocationUpdates() {
+    private void onModeIdle(){
+        mServiceMode = Mode.IDLE;
+        mLocationManager.removeUpdates(mLocationListener);
+    }
+
+    private void onModeActive(){
+        mServiceMode = Mode.ACTIVE;
+        mLocationManager.removeUpdates(mLocationListener);
         if(!requestLocationUpdates())
             ExceptionReporter.handle(
-                    new Exception("Failed to request location updates, either providers are disabled or permissions are not granted")
+                    new Exception("Failed to change service mode to active, either providers are disabled or permissions not granted")
             );
     }
 
-    public void pauseLocationUpdates() {
+    public Mode getServiceMode() {
+        return mServiceMode;
+    }
+
+    public void setMode(Mode mode){
+        if (mode == Mode.ACTIVE)
+            onModeActive();
+        else if (mode == Mode.PASSIVE)
+            onModePassive();
+        else
+            onModeIdle();
+    }
+
+    private void onModePassive(){
+        mServiceMode = Mode.PASSIVE;
         mLocationManager.removeUpdates(mLocationListener);
+    }
+
+    public void setModeIdle() {
+        onModeIdle();
+    }
+
+    public void setModeActive(){
+        onModeActive();
+    }
+
+    public void setModePassive(){
+        onModePassive();
     }
 
     public boolean isGPSEnabled() {
@@ -396,5 +424,11 @@ public class LocationService extends Service {
                 });
             }
         }
+    }
+
+    public enum Mode {
+        ACTIVE,
+        PASSIVE,
+        IDLE
     }
 }
