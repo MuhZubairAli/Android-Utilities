@@ -203,7 +203,7 @@ public class LocationService extends Service {
     }
 
     public synchronized static void start(Context context, Mode serviceMode, Class<? extends Context> pendingIntentClass){
-        if (LocationService.hasRequiredPermissions(context)) {
+        if (!isRunning() && LocationService.hasRequiredPermissions(context)) {
             Intent intent = new Intent(context, LocationService.class);
             if (pendingIntentClass != null){
                 Bundle bundle = new Bundle();
@@ -372,6 +372,12 @@ public class LocationService extends Service {
         mListOTCs.add(otc);
     }
 
+    @Override
+    public boolean onUnbind(Intent intent) {
+        mBinder.clear();
+        return super.onUnbind(intent);
+    }
+
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
@@ -452,7 +458,12 @@ public class LocationService extends Service {
             if (mBinder != null && mBinder.get() != null && mBinder.get().hasCallbacks()){
                 for (ILocationChangeCallback callback : mBinder.get().getLocationChangeCallbacks()) {
                     StaticUtils.getHandler().post(() -> {
-                            callback.onLocationChange(location);
+                        try {
+                            if (mBinder != null && mBinder.get() != null)
+                                callback.onLocationChange(location);
+                        } catch (Exception e) {
+                            ExceptionReporter.handle(e);
+                        }
                     });
                 }
             }

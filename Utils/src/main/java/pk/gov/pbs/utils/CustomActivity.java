@@ -529,9 +529,9 @@ public abstract class CustomActivity extends AppCompatActivity {
             };
         }
 
-        if (mLocationService == null) {
-            Intent intent = new Intent(this, LocationService.class);
-            if (notificationActivity != null){
+        Intent intent = new Intent(this, LocationService.class);
+        if (!LocationService.isRunning()) {
+            if (notificationActivity != null) {
                 Bundle bundle = new Bundle();
                 bundle.putParcelable(
                         LocationService.BROADCAST_EXTRA_NOTIFICATION_INTENT,
@@ -543,6 +543,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                                         PendingIntent.FLAG_IMMUTABLE
                         )
                 );
+
                 intent.putExtras(bundle);
                 intent.putExtra(LocationService.BROADCAST_EXTRA_SERVICE_MODE, serviceMode);
 
@@ -550,11 +551,11 @@ public abstract class CustomActivity extends AppCompatActivity {
                     startForegroundService(intent);
                 else
                     startService(intent);
-
-                if (!bindService(intent, mLocationServiceConnection, Context.BIND_AUTO_CREATE)){
-                    throw new Exception("startLocationService] - Failed to bind to LocationService");
-                }
             }
+        }
+
+        if (!bindService(intent, mLocationServiceConnection, Context.BIND_IMPORTANT)){
+            throw new Exception("startLocationService] - Failed to bind to LocationService");
         }
     }
 
@@ -577,7 +578,9 @@ public abstract class CustomActivity extends AppCompatActivity {
                 GPS_PROVIDER_ACCESS.clearAbortBroadcast();
                 unregisterReceiver(GPS_PROVIDER_ACCESS);
             }
-            unbindService(mLocationServiceConnection);
+
+            if (mLocationServiceConnection != null)
+                unbindService(mLocationServiceConnection);
         }
     }
     public LocationService getLocationService(){

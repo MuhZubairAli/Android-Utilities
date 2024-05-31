@@ -122,6 +122,10 @@ public class LocationActivity extends CustomActivity {
             }
         });
 
+        addLocationChangedCallback(location -> {
+            mUXToolkit.alert("Location Received from : "+ location.getProvider(),"This alert is raised from location change callback because service is bound \n<br />" + StaticUtils.toPrettyJson(location));
+        });
+
         locationReceiver = new LocationChangeReceiver();
         IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -157,6 +161,7 @@ public class LocationActivity extends CustomActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (locationReceiver != null) {
+
             unregisterReceiver(locationReceiver);
         }
     }
