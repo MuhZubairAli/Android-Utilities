@@ -18,7 +18,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.lang.ref.WeakReference;
 
@@ -31,10 +30,15 @@ public class UXToolkit {
     protected AlertDialog.Builder mDialogBuilder;
     protected ProgressDialog mProgressDialog;
 
-    public UXToolkit(Context activityContext){
-        mInputMethodManager = (InputMethodManager) activityContext.getSystemService(Activity.INPUT_METHOD_SERVICE);
-        mDialogBuilder = getDialogBuilder(activityContext);
+    public UXToolkit(Context context){
+        mInputMethodManager = (InputMethodManager) context.getSystemService(Activity.INPUT_METHOD_SERVICE);
+        mDialogBuilder = getDialogBuilder(context);
     }
+    public UXToolkit(Context context, int theme){
+        mInputMethodManager = (InputMethodManager) context.getSystemService(Activity.INPUT_METHOD_SERVICE);
+        mDialogBuilder = getDialogBuilder(context, theme);
+    }
+
     private AlertDialog.Builder getDialogBuilder(Context context, int theme){
         return  (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) ?
                 new AlertDialog.Builder(context) :
@@ -118,7 +122,7 @@ public class UXToolkit {
                 .setCancelable(cancelable);
     }
 
-    public AlertDialog buildAlertDialogue(
+    public AlertDialog buildAlert(
             String title,
             String message,
             String btnLabel,
@@ -171,12 +175,12 @@ public class UXToolkit {
         }
     }
 
-    public void showAlertDialogue(String title, String message, String btnLabel, UXEvent.AlertDialogue event){
-        buildAlertDialogue(title, message, btnLabel, event).show();
+    public void alert(String title, String message, String btnLabel, UXEvent.AlertDialogue event){
+        buildAlert(title, message, btnLabel, event).show();
     }
 
-    public void showAlertDialogue(int title, int message, int btnLabel, UXEvent.AlertDialogue event){
-        buildAlertDialogue(
+    public void alert(int title, int message, int btnLabel, UXEvent.AlertDialogue event){
+        buildAlert(
                 mDialogBuilder.getContext().getString(title),
                 mDialogBuilder.getContext().getString(message),
                 mDialogBuilder.getContext().getString(btnLabel),
@@ -184,56 +188,56 @@ public class UXToolkit {
         ).show();
     }
 
-    public void showAlertDialogue(String title, String message, UXEvent.AlertDialogue event){
-        buildAlertDialogue(title, message, null, event).show();
+    public void alert(String title, String message, UXEvent.AlertDialogue event){
+        buildAlert(title, message, null, event).show();
     }
 
-    public void showAlertDialogue(int title, int message, UXEvent.AlertDialogue event){
-        buildAlertDialogue(
+    public void alert(int title, int message, UXEvent.AlertDialogue event){
+        buildAlert(
                 mDialogBuilder.getContext().getString(title),
                 mDialogBuilder.getContext().getString(message),
                 null, event
         ).show();
     }
 
-    public void showAlertDialogue(String title, String message){
-        showAlertDialogue(title,message,null, null);
+    public void alert(String title, String message){
+        alert(title,message,null, null);
     }
 
-    public void showAlertDialogue(int title, int message){
-        showAlertDialogue(
+    public void alert(int title, int message){
+        alert(
                 mDialogBuilder.getContext().getString(title),
                 mDialogBuilder.getContext().getString(message),
                 null, null);
     }
 
-    public void showAlertDialogue(String message, UXEvent.AlertDialogue event){
-        showAlertDialogue(
+    public void alert(String message, UXEvent.AlertDialogue event){
+        alert(
                 mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue)
                 , message, null, event);
     }
 
-    public void showAlertDialogue(int message, UXEvent.AlertDialogue event){
-        showAlertDialogue(
+    public void alert(int message, UXEvent.AlertDialogue event){
+        alert(
                 mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue),
                 mDialogBuilder.getContext().getString(message),
                 null, event);
     }
 
-    public void showAlertDialogue(String message){
-        showAlertDialogue(
+    public void alert(String message){
+        alert(
                 mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue),
                 message, null, null);
     }
 
-    public void showAlertDialogue(int message){
-        showAlertDialogue(
+    public void alert(int message){
+        alert(
                 mDialogBuilder.getContext().getString(R.string.title_default_alert_dialogue),
                 mDialogBuilder.getContext().getString(message),
                 null, null);
     }
 
-    public AlertDialog buildConfirmDialogue(
+    public AlertDialog buildConfirm(
             String title,
             String message,
             String positiveBtnLabel,
@@ -286,46 +290,46 @@ public class UXToolkit {
         }
     }
 
-    public void showConfirmDialogue(String title, String message, String labelBtnPositive, String labelBtnNegative, UXEvent.ConfirmDialogue events){
-        buildConfirmDialogue(title, message, labelBtnPositive, labelBtnNegative, events).show();
+    public void confirm(String title, String message, String labelBtnPositive, String labelBtnNegative, UXEvent.ConfirmDialogue events){
+        buildConfirm(title, message, labelBtnPositive, labelBtnNegative, events).show();
     }
 
-    public void showConfirmDialogue(int title, int message, String labelBtnPositive, String labelBtnNegative, UXEvent.ConfirmDialogue events){
-        buildConfirmDialogue(
+    public void confirm(int title, int message, String labelBtnPositive, String labelBtnNegative, UXEvent.ConfirmDialogue events){
+        buildConfirm(
                 mDialogBuilder.getContext().getString(title),
                 mDialogBuilder.getContext().getString(message),
                 labelBtnPositive, labelBtnNegative, events)
                 .show();
     }
 
-    public void showConfirmDialogue(String title, String message, UXEvent.ConfirmDialogue events){
-        buildConfirmDialogue(title, message, null, null, events).show();
+    public void confirm(String title, String message, UXEvent.ConfirmDialogue events){
+        buildConfirm(title, message, null, null, events).show();
     }
 
-    public void showConfirmDialogue(int title, int message, UXEvent.ConfirmDialogue events){
-        buildConfirmDialogue(
+    public void confirm(int title, int message, UXEvent.ConfirmDialogue events){
+        buildConfirm(
                 mDialogBuilder.getContext().getString(title),
                 mDialogBuilder.getContext().getString(message)
                 , null, null, events)
                 .show();
     }
 
-    public void showConfirmDialogue(String message, UXEvent.ConfirmDialogue events){
-        buildConfirmDialogue(
+    public void confirm(String message, UXEvent.ConfirmDialogue events){
+        buildConfirm(
                 mDialogBuilder.getContext().getString(R.string.title_default_confirm_dialogue),
                 message, null, null, events).
                 show();
     }
 
-    public void showConfirmDialogue(int message, UXEvent.ConfirmDialogue events){
-        buildConfirmDialogue(
+    public void confirm(int message, UXEvent.ConfirmDialogue events){
+        buildConfirm(
                 mDialogBuilder.getContext().getString(R.string.title_default_confirm_dialogue),
                 mDialogBuilder.getContext().getString(message)
                 , null, null, events)
                 .show();
     }
 
-    public ProgressDialog buildProgressDialogue(
+    public ProgressDialog buildProgressDialog(
             String title,
             String message,
             DialogInterface.OnCancelListener cancelListener
@@ -341,23 +345,23 @@ public class UXToolkit {
         return dialog;
     }
 
-    public ProgressDialog buildProgressDialogue(String title, String message) {
-        return buildProgressDialogue(title, message, null);
+    public ProgressDialog buildProgressDialog(String title, String message) {
+        return buildProgressDialog(title, message, null);
     }
 
-    public ProgressDialog buildProgressDialogue(String title) {
-        return buildProgressDialogue(title, null, null);
+    public ProgressDialog buildProgressDialog(String title) {
+        return buildProgressDialog(title, null, null);
     }
 
     public void showProgressDialogue(String title){
-        mProgressDialog = buildProgressDialogue(title);
+        mProgressDialog = buildProgressDialog(title);
         mProgressDialog.show();
     }
 
-    public void showProgressDialogue(){
+    public void showProgressDialog(){
         if(mProgressDialog != null)
             dismissProgressDialogue();
-        mProgressDialog = buildProgressDialogue(null);
+        mProgressDialog = buildProgressDialog(null);
         mProgressDialog.show();
     }
 
@@ -366,25 +370,29 @@ public class UXToolkit {
             mProgressDialog.dismiss();
         mProgressDialog = null;
     }
-    public void showToast(String message){
+    public void toast(String message){
         Toast.makeText(mDialogBuilder.getContext(), message, Toast.LENGTH_LONG).show();
     }
 
-    public void showToast(int stringResource){
+    public void toast(int stringResource){
         Toast.makeText(mDialogBuilder.getContext(), stringResource, Toast.LENGTH_LONG).show();
     }
 
-    public void showToast(Spanned htm) {
+    public void toast(Spanned htm) {
         Toast.makeText(mDialogBuilder.getContext(), htm, Toast.LENGTH_LONG).show();
     }
 
     public static final class CommonAlerts {
-        private static AlertDialog dialogLocationSettings;
-        private static AlertDialog dialogAppSettings;
+        private static WeakReference<AlertDialog> dialogLocationSettings;
+        private static WeakReference<AlertDialog> dialogAppSettings;
 
-        public static void showAlertLocationSettings(UXToolkit toolkit){
-            if(dialogLocationSettings == null) {
-                dialogLocationSettings = toolkit.buildAlertDialogue(
+        public static void showLocationSettings(Context context){
+            showLocationSettings(new UXToolkit(context));
+        }
+
+        public static void showLocationSettings(UXToolkit toolkit){
+            if(dialogLocationSettings == null ||dialogLocationSettings.get() == null) {
+                dialogLocationSettings = new WeakReference<>(toolkit.buildAlert(
                         toolkit.mDialogBuilder.getContext().getString(R.string.alert_dialog_gps_title)
                         ,toolkit.mDialogBuilder.getContext().getString(R.string.alert_dialog_gps_message)
                         ,toolkit.mDialogBuilder.getContext().getString(R.string.label_btn_location_settings)
@@ -392,24 +400,28 @@ public class UXToolkit {
                             Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                             toolkit.mDialogBuilder.getContext().startActivity(intent);
                         }
-                );
+                ));
             }
 
-            if(!dialogLocationSettings.isShowing())
-                dialogLocationSettings.show();
+            if(!dialogLocationSettings.get().isShowing())
+                dialogLocationSettings.get().show();
         }
 
-        public static void showAlertAppPermissionsSetting(UXToolkit toolkit){
-            if(dialogAppSettings == null) {
-                dialogAppSettings = toolkit.buildConfirmDialogue(
-                         toolkit.mProgressDialog.getContext().getString(R.string.alert_dialog_all_permissions_title)
+        public static void showAppPermissionsSettings(Context context){
+            showAppPermissionsSetting(new UXToolkit(context));
+        }
+
+        public static void showAppPermissionsSetting(UXToolkit toolkit){
+            if(dialogAppSettings == null || dialogAppSettings.get() == null) {
+                dialogAppSettings = new WeakReference<>(toolkit.buildConfirm(
+                        toolkit.mDialogBuilder.getContext().getString(R.string.alert_dialog_all_permissions_title)
                         , toolkit.mDialogBuilder.getContext().getString(R.string.alert_dialog_all_permissions_message)
                         , toolkit.mDialogBuilder.getContext().getString(R.string.label_btn_permissions_settings)
                         , "Cancel"
                         , new UXEvent.ConfirmDialogue() {
                             @Override
                             public void onCancel(DialogInterface dialog, int which) {
-                                dialogAppSettings.dismiss();
+                                dialogAppSettings.get().dismiss();
                             }
 
                             @Override
@@ -424,11 +436,10 @@ public class UXToolkit {
                                 toolkit.mDialogBuilder.getContext().startActivity(i);
                             }
                         }
-
-                );
+                ));
             }
-            if(!dialogAppSettings.isShowing())
-                dialogAppSettings.show();
+            if(!dialogAppSettings.get().isShowing())
+                dialogAppSettings.get().show();
         }
 
     }

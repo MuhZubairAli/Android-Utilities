@@ -27,7 +27,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application>
-        <receiver android:name=".LocationActivity$ProviderDisabledReceiver"
+        <receiver android:name=".CustomActivity$ProviderDisabledReceiver"
             android:exported="true"
             android:permission="android.permission.ACCESS_FINE_LOCATION">
             <intent-filter>

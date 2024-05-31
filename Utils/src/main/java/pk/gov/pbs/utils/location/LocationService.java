@@ -52,12 +52,12 @@ public class LocationService extends Service {
     private static LocationService instance;
     private List<ILocationChangeCallback> mListOTCs;
     private WeakReference<LocationServiceBinder> mBinder;
-    private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 5;
-    private static final long MIN_TIME_BW_UPDATES = 1000 * 5;
+    private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 0;
+    private static final long MIN_TIME_BW_UPDATES = 1000 * 10;
 
     protected LocationManager mLocationManager;
     protected LocationListener mLocationListener;
-    private final String notificationTitle = "Location Service";
+    private static final String notificationTitle = "Location Service";
     private PendingIntent mNotificationIntent;
     private Mode mServiceMode;
 
@@ -114,16 +114,14 @@ public class LocationService extends Service {
 
     @Override
     public void onCreate() {
-        if (Constants.DEBUG_MODE)
-            Log.d(TAG, "onCreate: Location service created");
+        if (Constants.DEBUG_MODE) Log.d(TAG, "onCreate: Location service created");
 
+        super.onCreate();
         SystemUtils.createNotificationChannel(
                 this
                 , Constants.Notification_Channel_Name
                 , Constants.Notification_Channel_ID
         );
-
-        super.onCreate();
         mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         mLocationListener = new LocationServiceListener();
         instance = this;
@@ -131,33 +129,29 @@ public class LocationService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (Constants.DEBUG_MODE)
-            Log.d(TAG, "onStartCommand: Location service started");
+        if (Constants.DEBUG_MODE) Log.d(TAG, "onStartCommand: Location service started");
 
-
-
+        Bundle bundle = intent.getExtras();
         NotificationCompat.Builder notification = new NotificationCompat.Builder(this, Constants.Notification_Channel_ID)
                 .setContentTitle(notificationTitle)
-                .setContentText("Finding device location...")
                 .setSmallIcon(R.drawable.ic_auto_mode);
 
-        Bundle bundle = null;
-        if (intent != null && (bundle = intent.getExtras()) != null && bundle.containsKey(BROADCAST_EXTRA_NOTIFICATION_INTENT)){
-            mNotificationIntent = bundle.getParcelable(BROADCAST_EXTRA_NOTIFICATION_INTENT);
-            if (mNotificationIntent != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                mNotificationIntent.isForegroundService();
+        if (bundle != null) {
+            if (bundle.containsKey(BROADCAST_EXTRA_NOTIFICATION_INTENT)) {
+                mNotificationIntent = bundle.getParcelable(BROADCAST_EXTRA_NOTIFICATION_INTENT);
+                if (mNotificationIntent != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    mNotificationIntent.isForegroundService();
+                }
+                notification.setContentIntent(mNotificationIntent);
             }
-            notification.setContentIntent(mNotificationIntent);
-        }
+            if (bundle.containsKey(BROADCAST_EXTRA_SERVICE_MODE)) {
+                setMode((Mode) bundle.getSerializable(BROADCAST_EXTRA_SERVICE_MODE));
+            } else
+                setModeIdle();
 
+        }
+        notification.setContentText(getNotificationDescription(mServiceMode));
         startForeground(SERVICE_NOTIFICATION_ID, notification.build());
-
-        if (bundle != null && bundle.containsKey(LocationService.BROADCAST_EXTRA_SERVICE_MODE)){
-            Mode mode = (Mode) bundle.getSerializable(LocationService.BROADCAST_EXTRA_SERVICE_MODE);
-            setMode(mode);
-        } else {
-            setModeActive();
-        }
         return START_STICKY;
     }
 
@@ -166,6 +160,17 @@ public class LocationService extends Service {
         super.onDestroy();
         mLocationManager.removeUpdates(mLocationListener);
         instance = null;
+    }
+
+    private String getNotificationDescription(Mode mode){
+        switch (mode){
+            case ACTIVE:
+                return "Finding location...";
+            case PASSIVE:
+                return "Passive location";
+            default:
+                return "Service is idle";
+        }
     }
 
     public static void stop(Context context){
@@ -181,11 +186,23 @@ public class LocationService extends Service {
         return instance != null;
     }
 
-    public static void start(Context context){
-        start(context, null);
+    public static void startPassiveMode(Context context){
+        start(context, Mode.PASSIVE, null);
     }
 
-    public synchronized static void start(Context context, Class<? extends Context> pendingIntentClass){
+    public static void startPassiveMode(Context context, Class<? extends Context> pendingIntentClass){
+        start(context, Mode.PASSIVE, pendingIntentClass);
+    }
+
+    public static void startActiveMode(Context context){
+        start(context, Mode.ACTIVE, null);
+    }
+
+    public static void startActiveMode(Context context, Class<? extends Context> pendingIntentClass){
+        start(context, Mode.ACTIVE, pendingIntentClass);
+    }
+
+    public synchronized static void start(Context context, Mode serviceMode, Class<? extends Context> pendingIntentClass){
         if (LocationService.hasRequiredPermissions(context)) {
             Intent intent = new Intent(context, LocationService.class);
             if (pendingIntentClass != null){
@@ -200,7 +217,7 @@ public class LocationService extends Service {
                                 PendingIntent.FLAG_IMMUTABLE
                         )
                 );
-                bundle.putSerializable(LocationService.BROADCAST_EXTRA_SERVICE_MODE, Mode.IDLE);
+                bundle.putSerializable(LocationService.BROADCAST_EXTRA_SERVICE_MODE, serviceMode);
                 intent.putExtras(bundle);
             }
 
@@ -212,48 +229,57 @@ public class LocationService extends Service {
             ExceptionReporter.handle(new Exception("can not start LocationService, Permissions pertaining to LocationService not granted"));
     }
 
-    protected boolean requestLocationUpdates() {
-        if (Constants.DEBUG_MODE)
-            Log.d(TAG, "requestLocationUpdates]: requesting location updates");
-        List<String> providers = mLocationManager.getAllProviders();
-        List<String> enabled = mLocationManager.getProviders(true);
+    protected void requestLocationUpdates() throws IllegalStateException {
         if (hasRequiredPermissions(this)) {
-            if (isGPSEnabled() || isNetworkEnabled()) {
-                if (isNetworkEnabled()) {
-                    mLocationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER,
-                            MIN_TIME_BW_UPDATES,
-                            MIN_DISTANCE_CHANGE_FOR_UPDATES,
-                            mLocationListener);
-                }
+            if (mServiceMode == Mode.ACTIVE) {
+                if (isGpsProviderEnabled() || isNetworkProviderEnabled() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && isFusedProviderEnabled())) {
+                    if (Constants.DEBUG_MODE)
+                        Log.d(TAG, "requestLocationUpdates]: requesting location updates from active location providers");
 
-                if (isGPSEnabled()){
+                    // Network Provider
+                    if (isNetworkProviderEnabled()) {
+                        mLocationManager.requestLocationUpdates(
+                                LocationManager.NETWORK_PROVIDER,
+                                MIN_TIME_BW_UPDATES,
+                                MIN_DISTANCE_CHANGE_FOR_UPDATES,
+                                mLocationListener);
+                    }
+
+                    // GPS Provider
+                    if (isGpsProviderEnabled()) {
+                        mLocationManager.requestLocationUpdates(
+                                LocationManager.GPS_PROVIDER,
+                                MIN_TIME_BW_UPDATES,
+                                MIN_DISTANCE_CHANGE_FOR_UPDATES,
+                                mLocationListener);
+                    }
+
+                    // Fused Provider
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && isFusedProviderEnabled()) {
+                        mLocationManager.requestLocationUpdates(
+                                LocationManager.FUSED_PROVIDER,
+                                MIN_TIME_BW_UPDATES,
+                                MIN_DISTANCE_CHANGE_FOR_UPDATES,
+                                mLocationListener);
+                    }
+                }
+            } else if (mServiceMode == Mode.PASSIVE) {
+                if (isPassiveProviderEnabled()){
                     mLocationManager.requestLocationUpdates(
-                            LocationManager.GPS_PROVIDER,
+                            LocationManager.PASSIVE_PROVIDER,
                             MIN_TIME_BW_UPDATES,
                             MIN_DISTANCE_CHANGE_FOR_UPDATES,
                             mLocationListener);
                 }
-                return true;
-            }
+            } else
+                throw new IllegalStateException("service Mode is IDLE, location updates cannot be requested, set service Mode to ACTIVE or PASSIVE");
         } else {
-            ExceptionReporter.handle(new Exception("required permissions for LocationService not granted"));
+            throw new IllegalStateException("required permissions for LocationService not granted");
         }
-        return false;
     }
 
-    private void onModeIdle(){
-        mServiceMode = Mode.IDLE;
-        mLocationManager.removeUpdates(mLocationListener);
-    }
-
-    private void onModeActive(){
-        mServiceMode = Mode.ACTIVE;
-        mLocationManager.removeUpdates(mLocationListener);
-        if(!requestLocationUpdates())
-            ExceptionReporter.handle(
-                    new Exception("Failed to change service mode to active, either providers are disabled or permissions not granted")
-            );
+    public LocationManager getLocationManager() {
+        return mLocationManager;
     }
 
     public Mode getServiceMode() {
@@ -262,36 +288,45 @@ public class LocationService extends Service {
 
     public void setMode(Mode mode){
         if (mode == Mode.ACTIVE)
-            onModeActive();
+            setModeActive();
         else if (mode == Mode.PASSIVE)
-            onModePassive();
+            setModePassive();
         else
-            onModeIdle();
-    }
-
-    private void onModePassive(){
-        mServiceMode = Mode.PASSIVE;
-        mLocationManager.removeUpdates(mLocationListener);
+            setModeIdle();
     }
 
     public void setModeIdle() {
-        onModeIdle();
+        mServiceMode = Mode.IDLE;
+        mLocationManager.removeUpdates(mLocationListener);
     }
 
     public void setModeActive(){
-        onModeActive();
+        mServiceMode = Mode.ACTIVE;
+        mLocationManager.removeUpdates(mLocationListener);
+        requestLocationUpdates();
     }
 
     public void setModePassive(){
-        onModePassive();
+        mServiceMode = Mode.PASSIVE;
+        mLocationManager.removeUpdates(mLocationListener);
+        requestLocationUpdates();
     }
 
-    public boolean isGPSEnabled() {
+    public boolean isGpsProviderEnabled() {
         return mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
     }
 
-    public boolean isNetworkEnabled() {
+    public boolean isNetworkProviderEnabled() {
         return mLocationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    public boolean isFusedProviderEnabled() {
+        return mLocationManager.isProviderEnabled(LocationManager.FUSED_PROVIDER);
+    }
+
+    public boolean isPassiveProviderEnabled() {
+        return mLocationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER);
     }
 
     /**
@@ -309,9 +344,9 @@ public class LocationService extends Service {
     public Location getLocation() {
         Location gpsLocation = null;
         Location networkLocation = null;
-        if (isGPSEnabled())
+        if (isGpsProviderEnabled())
             gpsLocation = mLocationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-        if (isNetworkEnabled())
+        if (isNetworkProviderEnabled())
             networkLocation = mLocationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
         if(gpsLocation != null && networkLocation != null)
             return gpsLocation.getAccuracy() < networkLocation.getAccuracy() ? gpsLocation : networkLocation;
@@ -340,13 +375,13 @@ public class LocationService extends Service {
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        requestLocationUpdates(); // onBind startRequesting updates in case location updates are paused
         mBinder = new WeakReference<>(new LocationServiceBinder());
         return mBinder.get();
     }
 
     public final class LocationServiceBinder extends Binder {
         private List<ILocationChangeCallback> mCallbacks;
+
         public LocationService getService(){
             return LocationService.this;
         }
@@ -373,8 +408,7 @@ public class LocationService extends Service {
 
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) {
-            if (Constants.DEBUG_MODE)
-                Log.d(TAG, "onStatusChanged: Change in GPS detected");
+            Log.d(TAG, "onStatusChanged: Change in Provider detected");
         }
 
         @Override
@@ -386,8 +420,7 @@ public class LocationService extends Service {
 
         @Override
         public void onLocationChanged(@NonNull Location location) {
-            if (Constants.DEBUG_MODE)
-                Log.d(TAG, "onLocationChanged: Location changed : " + location);
+            if (Constants.DEBUG_MODE) Log.d(TAG, "onLocationChanged: Location changed : " + location);
 
             NotificationCompat.Builder nBuilder = new NotificationCompat.Builder(LocationService.this, Constants.Notification_Channel_ID)
                     .setContentTitle(notificationTitle)
@@ -417,11 +450,11 @@ public class LocationService extends Service {
             }
 
             if (mBinder != null && mBinder.get() != null && mBinder.get().hasCallbacks()){
-                StaticUtils.getHandler().post(() -> {
-                    for (ILocationChangeCallback callback : mBinder.get().getLocationChangeCallbacks()) {
-                        callback.onLocationChange(location);
-                    }
-                });
+                for (ILocationChangeCallback callback : mBinder.get().getLocationChangeCallbacks()) {
+                    StaticUtils.getHandler().post(() -> {
+                            callback.onLocationChange(location);
+                    });
+                }
             }
         }
     }

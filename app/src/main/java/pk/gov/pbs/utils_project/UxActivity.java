@@ -17,12 +17,11 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-import pk.gov.pbs.utils.LocationActivity;
+import pk.gov.pbs.utils.CustomActivity;
 import pk.gov.pbs.utils.UXEvent;
-import pk.gov.pbs.utils.UXToolkit;
 import pk.gov.pbs.utils.location.LocationService;
 
-public class UxActivity extends LocationActivity {
+public class UxActivity extends CustomActivity {
     LocationReceiver mLocationReceiver;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,16 +37,16 @@ public class UxActivity extends LocationActivity {
         Utils.setVersionTextAndBehaviour(this, findViewById(R.id.tvApiLevel));
 
         findViewById(R.id.btnAlert).setOnClickListener(v -> {
-            mUXToolkit.showAlertDialogue(
+            mUXToolkit.alert(
                     "Example Title",
                     Utils.generateText(),
                     "Affirmative Label",
-                    (dialog, which) -> mUXToolkit.showToast("Alert closed")
+                    (dialog, which) -> mUXToolkit.toast("Alert closed")
             );
         });
 
         findViewById(R.id.btnConfirm).setOnClickListener(v -> {
-            mUXToolkit.showConfirmDialogue(
+            mUXToolkit.confirm(
                     "Example Title",
                     Utils.generateText(),
                     "Affirmative Label",
@@ -55,25 +54,25 @@ public class UxActivity extends LocationActivity {
                     new UXEvent.ConfirmDialogue() {
                         @Override
                         public void onCancel(DialogInterface dialog, int which) {
-                            mUXToolkit.showToast("Confirm Dialog Cancelled");
+                            mUXToolkit.toast("Confirm Dialog Cancelled");
                         }
 
                         @Override
                         public void onOK(DialogInterface dialog, int which) {
-                            mUXToolkit.showToast("Confirm Dialog OK");
+                            mUXToolkit.toast("Confirm Dialog OK");
                         }
                     }
             );
         });
 
         findViewById(R.id.btnProgress).setOnClickListener(v -> {
-            ProgressDialog dialog = mUXToolkit.buildProgressDialogue(
+            ProgressDialog dialog = mUXToolkit.buildProgressDialog(
                     "Test Progress",
                     "Example tile for progress dialog, it is cancellable, it could be made non-cancellable by setting cancellable to false"
                     , new DialogInterface.OnCancelListener() {
                         @Override
                         public void onCancel(DialogInterface dialog) {
-                            mUXToolkit.showToast("Progress Dialog Cancelled");
+                            mUXToolkit.toast("Progress Dialog Cancelled");
                         }
                     }
             );
@@ -93,7 +92,7 @@ public class UxActivity extends LocationActivity {
             mUXToolkit.hideKeyboardFrom(et);
         });
 
-        LocationService.start(this, pk.gov.pbs.utils_project.LocationActivity.class);
+        LocationService.startActiveMode(this, pk.gov.pbs.utils_project.LocationActivity.class);
         mLocationReceiver = new LocationReceiver();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
             registerReceiver(mLocationReceiver, new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_CHANGED), RECEIVER_EXPORTED);
@@ -113,7 +112,7 @@ public class UxActivity extends LocationActivity {
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equalsIgnoreCase(LocationService.BROADCAST_ACTION_LOCATION_CHANGED)){
                 Location location = intent.getParcelableExtra(LocationService.BROADCAST_EXTRA_LOCATION_DATA);
-                UxActivity.this.mUXToolkit.buildConfirmDialogue(
+                UxActivity.this.mUXToolkit.buildConfirm(
                         "Location Changed",
                         "Latitude: " + location.getLatitude() + " Longitude: " + location.getLongitude(),
                         "OK",

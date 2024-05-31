@@ -10,6 +10,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import pk.gov.pbs.utils.CustomActivity;
+import pk.gov.pbs.utils.ExceptionReporter;
 
 public class MainActivity extends CustomActivity {
     @Override

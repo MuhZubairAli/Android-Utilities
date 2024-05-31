@@ -3,9 +3,7 @@ package pk.gov.pbs.utils_project;
 import android.Manifest;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.location.Location;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -19,8 +17,6 @@ import androidx.core.view.WindowInsetsCompat;
 import pk.gov.pbs.utils.CustomActivity;
 import pk.gov.pbs.utils.ExceptionReporter;
 import pk.gov.pbs.utils.FileManager;
-import pk.gov.pbs.utils.LocationActivity;
-import pk.gov.pbs.utils.location.ILocationChangeCallback;
 
 public class PermissionActivity extends CustomActivity {
     TableLayout tblPerms, tblPermsRequested;

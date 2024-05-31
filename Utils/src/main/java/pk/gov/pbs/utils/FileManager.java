@@ -300,7 +300,7 @@ public class FileManager {
 
     public File getRootExternalPrivateCache(){
         File[] cacheDirs = mContext.getExternalCacheDirs();
-        File preferredCache = null;
+        File preferredCache = cacheDirs[0];
         long freeSpace = 0;
         for (File cacheDir : cacheDirs) {
             if (cacheDir.canRead() && cacheDir.canWrite()) {
@@ -582,6 +582,14 @@ public class FileManager {
 
     public static DirectoryPath pathToDirectory(String... path){
         return DirectoryPath.toDirectory(path);
+    }
+
+    public static FileOperator file(File file){
+        return new FileOperator(file);
+    }
+
+    public static DirectoryOperator directory(File file){
+        return new DirectoryOperator(file);
     }
 
     public static class FilePath {

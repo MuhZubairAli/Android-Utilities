@@ -1,21 +1,28 @@
 package pk.gov.pbs.utils;
 
-import static pk.gov.pbs.utils.UXToolkit.CommonAlerts.showAlertAppPermissionsSetting;
+import static pk.gov.pbs.utils.UXToolkit.CommonAlerts.showAppPermissionsSetting;
+import static pk.gov.pbs.utils.UXToolkit.CommonAlerts.showLocationSettings;
 
 import android.Manifest;
-import android.app.AlertDialog;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.IBinder;
 import android.provider.Settings;
 import android.text.Html;
 import android.text.Spanned;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
@@ -36,6 +43,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Stack;
 
+import pk.gov.pbs.utils.location.ILocationChangeCallback;
+import pk.gov.pbs.utils.location.LocationService;
+
 public abstract class CustomActivity extends AppCompatActivity {
     private static final String TAG = ":Utils] CustomActivity";
     private static final int mSystemControlsHideFlags =
@@ -51,6 +61,13 @@ public abstract class CustomActivity extends AppCompatActivity {
     private final Map<String, PermissionRequestHandler> mSpecialPermissionsHandlers = new HashMap<>(2);
     private final Stack<PermissionRequestHandler> mSpecialPermissions = new Stack<>();
     private ActivityResultLauncher<String[]> requestPermissionLauncher;
+
+    private Runnable mAfterLocationServiceStartCallback;
+    private LocationService mLocationService = null;
+    private ServiceConnection mLocationServiceConnection = null;
+    private BroadcastReceiver GPS_PROVIDER_ACCESS = null;
+    private final List<ILocationChangeCallback> mLocationChangeCallbacks = new ArrayList<>();
+    private static byte mLocationAttachAttempts = 0;
 
     private LayoutInflater mLayoutInflater;
     protected UXToolkit mUXToolkit;
@@ -68,6 +85,36 @@ public abstract class CustomActivity extends AppCompatActivity {
         if (!mSpecialPermissions.isEmpty()){
             mSpecialPermissions.pop().askPermission();
         }
+
+        if (LocationService.isRunning()) {
+            if (!LocationService.getInstance().isNetworkProviderEnabled() && !LocationService.getInstance().isGpsProviderEnabled())
+                showLocationSettings(getUXToolkit());
+
+            if (mLocationService == null)
+                mLocationService = LocationService.getInstance();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (LocationService.isRunning()) {
+            unbindLocationService();
+        }
+        super.onDestroy();
+    }
+
+    @NonNull
+    public LayoutInflater getLayoutInflater(){
+        if (mLayoutInflater == null)
+            mLayoutInflater = LayoutInflater.from(this);
+        return mLayoutInflater;
+    }
+    public UXToolkit getUXToolkit(){
+        return mUXToolkit;
+    }
+
+    public FileManager getFileManager(){
+        return mFileManager;
     }
 
 //    For android 11 and below, onRequestPermissionsResult() will be called
@@ -131,6 +178,11 @@ public abstract class CustomActivity extends AppCompatActivity {
         mFileManager = FileManager.getInstance(this);
 
         mPermissions.add(Manifest.permission.READ_PHONE_STATE);
+        // Adding STORAGE_MANGER_PERMISSION request handler because FileManager utility is provided by default
+        addPermissions(FileManager.getPermissionsRequired());
+        addPermissions(LocationService.getPermissionsRequired());
+
+        // Adding POST_NOTIFICATIONS request handler
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             mPermissions.add(Manifest.permission.POST_NOTIFICATIONS);
             addSpecialPermission(Manifest.permission.POST_NOTIFICATIONS, "Notification permission is required in order to Show Notifications from foreground services", new PermissionRequest() {
@@ -149,9 +201,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                 }
             });
         }
-
-        // Adding STORAGE_MANGER_PERMISSION request handler because FileManager utility is provided by default
-        mPermissions.addAll(Arrays.asList(FileManager.getPermissionsRequired()));
+        // Adding MANAGE_EXTERNAL_STORAGE request handler
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
             addSpecialPermission(
                     Manifest.permission.MANAGE_EXTERNAL_STORAGE
@@ -167,6 +217,28 @@ public abstract class CustomActivity extends AppCompatActivity {
                             Uri uri = Uri.parse("package:" + CustomActivity.this.getPackageName());
                             Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, uri);
                             startActivity(intent);
+                        }
+                    }
+            );
+        }
+        // Adding BACKGROUND_LOCATION request handler
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            addSpecialPermission(
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                    "This application requires background location to work properly, Please enable the option of 'Allow all the time' on Location Permissions screen."
+                    , new PermissionRequest() {
+                        @Override
+                        public boolean hasPermission() {
+                            return
+                                    (
+                                        ActivityCompat.checkSelfPermission(CustomActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                        || ActivityCompat.checkSelfPermission(CustomActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                    ) && ActivityCompat.checkSelfPermission(CustomActivity.this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                        }
+
+                        @Override
+                        public void askPermission() {
+                            requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION});
                         }
                     }
             );
@@ -189,7 +261,7 @@ public abstract class CustomActivity extends AppCompatActivity {
 
                     if (!deniedPermission.isEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         if (showRationale) {
-                            mUXToolkit.showConfirmDialogue(
+                            getUXToolkit().confirm(
                                 "Permission Required"
                                 , "All requested permissions are required to work properly, Kindly grant all the requested permissions"
                                 , "Open Permissions Settings"
@@ -216,12 +288,19 @@ public abstract class CustomActivity extends AppCompatActivity {
                             if (permissions.size() == 1 && permissions.containsKey(Manifest.permission.MANAGE_EXTERNAL_STORAGE))
                                 requestSpecialPermissions();
                             else
-                                showAlertAppPermissionsSetting(getUXToolkit());
+                                showAppPermissionsSetting(getUXToolkit());
                         }
                     } else if (deniedPermission.isEmpty() && !permissions.isEmpty()) {
                         requestSpecialPermissions();
                     }
                 });
+
+        GPS_PROVIDER_ACCESS = new ProviderDisabledReceiver();
+        IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_PROVIDER_DISABLED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            registerReceiver(GPS_PROVIDER_ACCESS, intentFilter, RECEIVER_NOT_EXPORTED);
+        } else
+            registerReceiver(GPS_PROVIDER_ACCESS, intentFilter);
     }
 
     protected String[] getAllPermissions(){
@@ -408,19 +487,169 @@ public abstract class CustomActivity extends AppCompatActivity {
         });
     }
 
-
-    @NonNull
-    public LayoutInflater getLayoutInflater(){
-        if (mLayoutInflater == null)
-            mLayoutInflater = LayoutInflater.from(this);
-        return mLayoutInflater;
+    /**
+     * This method start the LocationService and bind this activity with the service
+     * in order to user addLocationChangedCallback(ILocationChangeCallback) use this method
+     * to start the service. otherwise location change event do not execute the callbacks
+     * and current location is only delivered by BroadcastReceiver
+     * Please note that if service is running then it will always send new location to BroadcastReceivers
+     * no matter an activity is bound with the service or not
+     */
+    protected void startLocationService() throws Exception {
+        startLocationService(LocationService.Mode.IDLE,null);
     }
-    public UXToolkit getUXToolkit(){
-        return mUXToolkit;
+
+    /**
+     * This method start the LocationService and bind this activity with the service
+     * in order to user addLocationChangedCallback(ILocationChangeCallback) use this method
+     * to start the service. otherwise location change event do not execute the callbacks
+     * and current location is only delivered by BroadcastReceiver
+     * @param notificationActivity activity for PendingIntent (for Service Notification)
+     */
+    protected void startLocationService(LocationService.Mode serviceMode, @Nullable Class<? extends Context> notificationActivity) throws Exception {
+        Log.d(TAG, "startLocationService: Starting location service");
+        if (mLocationServiceConnection == null) {
+            mLocationServiceConnection = new ServiceConnection() {
+                @Override
+                public void onServiceConnected(ComponentName name, IBinder service) {
+                    LocationService.LocationServiceBinder binder = (LocationService.LocationServiceBinder) service;
+                    mLocationService = binder.getService();
+                    binder.setLocationChangeCallbacks(mLocationChangeCallbacks);
+                    if (!mLocationService.isNetworkProviderEnabled() && !mLocationService.isGpsProviderEnabled())
+                        showLocationSettings(CustomActivity.this.getUXToolkit());
+
+                    if (mAfterLocationServiceStartCallback != null)
+                        mAfterLocationServiceStartCallback.run();
+                }
+
+                @Override
+                public void onServiceDisconnected(ComponentName name) {
+                    mLocationService = null;
+                }
+            };
+        }
+
+        if (mLocationService == null) {
+            Intent intent = new Intent(this, LocationService.class);
+            if (notificationActivity != null){
+                Bundle bundle = new Bundle();
+                bundle.putParcelable(
+                        LocationService.BROADCAST_EXTRA_NOTIFICATION_INTENT,
+                        PendingIntent.getActivity(
+                                this,
+                                0,
+                                new Intent(this, notificationActivity),
+                                PendingIntent.FLAG_UPDATE_CURRENT |
+                                        PendingIntent.FLAG_IMMUTABLE
+                        )
+                );
+                intent.putExtras(bundle);
+                intent.putExtra(LocationService.BROADCAST_EXTRA_SERVICE_MODE, serviceMode);
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    startForegroundService(intent);
+                else
+                    startService(intent);
+
+                if (!bindService(intent, mLocationServiceConnection, Context.BIND_AUTO_CREATE)){
+                    throw new Exception("startLocationService] - Failed to bind to LocationService");
+                }
+            }
+        }
     }
 
-    public FileManager getFileManager(){
-        return mFileManager;
+    protected void stopLocationService(){
+        if (LocationService.isRunning()) {
+            unbindLocationService();
+            if(!stopService(new Intent(this, LocationService.class)))
+                getLocationService().stopSelf();
+        }
+    }
+
+    /**
+     * in order to unbind the LocationService use this method
+     * this will not stop the service and BroadcastReceivers shall still
+     * receive new locations but LocationChangeCallbacks will not be executed
+     */
+    protected void unbindLocationService(){
+        if(mLocationService != null) {
+            if (GPS_PROVIDER_ACCESS.isOrderedBroadcast()) {
+                GPS_PROVIDER_ACCESS.clearAbortBroadcast();
+                unregisterReceiver(GPS_PROVIDER_ACCESS);
+            }
+            unbindService(mLocationServiceConnection);
+        }
+    }
+    public LocationService getLocationService(){
+        if (mLocationService == null && LocationService.isRunning())
+            mLocationService = LocationService.getInstance();
+        return mLocationService;
+    }
+
+    public void addLocationChangedCallback(ILocationChangeCallback callback){
+        mLocationChangeCallbacks.add(callback);
+    }
+    public void removeLocationChangedCallback(ILocationChangeCallback callback){
+        mLocationChangeCallbacks.remove(callback);
+    }
+
+    /**
+     * this helper method attaches OTC with location service
+     * it will attempt 5 times with 1 sec gap if locationService is not available then throws exception
+     * it will not start location service (only waits 5 secs if location service is starting)
+     * @param callback OTC to be attached with the service
+     */
+    public void addLocationChangedOneTimeCallback(ILocationChangeCallback callback) {
+        StaticUtils.getHandler().postDelayed(()-> {
+            if (getLocationService() != null) {
+                getLocationService().addLocationChangedOTC(callback);
+                mLocationAttachAttempts = 0;
+            } else {
+                if (++mLocationAttachAttempts >= 5) {
+                    ExceptionReporter.handle(
+                            new Exception("addOTC] - Attempt to add location listener to LocationService failed after 5 tries, Location service has not started")
+                    );
+                    mLocationAttachAttempts = 0;
+                } else
+                    addLocationChangedOneTimeCallback(callback);
+            }
+        },1000);
+    }
+
+    public void verifyCurrentLocation(ILocationChangeCallback callback) {
+        if (mLocationService != null) {
+            checkLocationAndRunCallback(callback);
+        } else {
+            try {
+                startLocationService();
+                mAfterLocationServiceStartCallback = () -> {
+                    checkLocationAndRunCallback(callback);
+                };
+            } catch (Exception e) {
+                ExceptionReporter.handle(e);
+            }
+        }
+    }
+
+    private void checkLocationAndRunCallback(@NonNull ILocationChangeCallback callback){
+        if (mLocationService.getLocation() == null) {
+            mUXToolkit.showProgressDialogue("Getting current location, please wait...");
+            mLocationService.addLocationChangedOTC((location -> {
+                mUXToolkit.dismissProgressDialogue();
+                callback.onLocationChange(location);
+            }));
+        } else {
+            callback.onLocationChange(mLocationService.getLocation());
+        }
+    }
+
+    public static class ProviderDisabledReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(LocationService.BROADCAST_ACTION_PROVIDER_DISABLED)) {
+                showLocationSettings(context);
+            }
+        }
     }
 
     protected class PermissionRequestHandler {
@@ -445,7 +674,7 @@ public abstract class CustomActivity extends AppCompatActivity {
             )
                 return;
 
-            mUXToolkit.showConfirmDialogue(
+            mUXToolkit.confirm(
                     "Permission Required"
                     , permissionRequestStatement
                     , "Proceed"

@@ -1,6 +1,6 @@
 package pk.gov.pbs.utils_project;
 
-import static pk.gov.pbs.utils.UXToolkit.CommonAlerts.showAlertLocationSettings;
+import static pk.gov.pbs.utils.UXToolkit.CommonAlerts.showLocationSettings;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -23,12 +23,13 @@ import androidx.core.view.WindowInsetsCompat;
 import java.util.HashMap;
 import java.util.Map;
 
+import pk.gov.pbs.utils.CustomActivity;
 import pk.gov.pbs.utils.DateTimeUtil;
 import pk.gov.pbs.utils.ExceptionReporter;
 import pk.gov.pbs.utils.StaticUtils;
 import pk.gov.pbs.utils.location.LocationService;
 
-public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
+public class LocationActivity extends CustomActivity {
 
     TextView tvLocation;
     TableLayout tblLocation;
@@ -50,12 +51,19 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
         tvLocation = findViewById(R.id.tvLocation);
         tblLocation = findViewById(R.id.tblLocation);
 
-        findViewById(R.id.btnStart).setOnClickListener((v) -> startLocationService(this.getClass()));
+        findViewById(R.id.btnStart).setOnClickListener((v) -> {
+            try {
+                startLocationService(LocationService.Mode.ACTIVE, this.getClass());
+            } catch (Exception e) {
+                ExceptionReporter.handle(e);
+            }
+        });
+
         findViewById(R.id.btnStop).setOnClickListener((v) -> unbindLocationService());
 
         findViewById(R.id.btnLocation).setOnClickListener((v) -> {
             if (getLocationService() == null) {
-                mUXToolkit.showToast("Location service not started!");
+                mUXToolkit.toast("Location service not started!");
                 return;
             }
 
@@ -69,9 +77,10 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
                 }
             }
         });
+        
         findViewById(R.id.btnPause).setOnClickListener((v) -> {
             if (getLocationService() == null) {
-                mUXToolkit.showToast("Location service not started!");
+                mUXToolkit.toast("Location service not started!");
                 return;
             }
             getLocationService().setModeIdle();
@@ -79,10 +88,10 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
 
         findViewById(R.id.btnResume).setOnClickListener((v) -> {
             if (getLocationService() == null) {
-                mUXToolkit.showToast("Location service not started!");
+                mUXToolkit.toast("Location service not started!");
                 return;
             }
-            getLocationService().resumeLocationUpdates();
+            getLocationService().setModeActive();
         });
 
         findViewById(R.id.btnPermissions).setOnClickListener((v) -> {
@@ -90,16 +99,16 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
                 LocationService.requestRequiredPermissions(this);
             }
             else
-                mUXToolkit.showToast("Required permissions granted! LocationService could be used now!");
+                mUXToolkit.alert("Required permissions granted! LocationService could be used now!");
         });
 
         findViewById(R.id.btnLocSettings).setOnClickListener((v) -> {
-            showAlertLocationSettings(getUXToolkit());
+            showLocationSettings(getUXToolkit());
         });
 
         findViewById(R.id.btnLastKnown).setOnClickListener((v) -> {
             if (getLocationService() == null)
-                mUXToolkit.showAlertDialogue("Location service not started");
+                mUXToolkit.alert("Location service not started");
             else {
                 Location location = getLocationService().getLastKnownLocation();
                 if (location != null) {
@@ -112,6 +121,14 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
                 }
             }
         });
+
+        locationReceiver = new LocationChangeReceiver();
+        IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            registerReceiver(locationReceiver, intentFilter, RECEIVER_EXPORTED);
+        } else
+            registerReceiver(locationReceiver, intentFilter);
+
     }
 
     @Override
@@ -124,7 +141,7 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
                 has &= result == PackageManager.PERMISSION_GRANTED;
 
             if (!has){
-                mUXToolkit.showAlertDialogue("Location permissions not granted");
+                mUXToolkit.alert("Location permissions not granted");
                 return;
             }
 
@@ -137,24 +154,10 @@ public class LocationActivity extends pk.gov.pbs.utils.LocationActivity {
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
+    protected void onDestroy() {
+        super.onDestroy();
         if (locationReceiver != null) {
             unregisterReceiver(locationReceiver);
-            locationReceiver = null;
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (locationReceiver == null) {
-            locationReceiver = new LocationChangeReceiver();
-            IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                registerReceiver(locationReceiver, intentFilter, RECEIVER_EXPORTED);
-            } else
-                registerReceiver(locationReceiver, intentFilter);
         }
     }
 

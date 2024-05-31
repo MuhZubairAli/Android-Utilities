@@ -54,7 +54,7 @@ public class TextActivity extends CustomActivity {
                 String.join(", ", list)
         );
 
-        LocationService.start(this, LocationActivity.class);
+        LocationService.start(this, LocationService.Mode.ACTIVE, LocationActivity.class);
     }
 
     public void applyFont(View view) {

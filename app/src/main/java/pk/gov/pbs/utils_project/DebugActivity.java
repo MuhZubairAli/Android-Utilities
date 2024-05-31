@@ -38,8 +38,6 @@ public class DebugActivity extends CustomActivity {
             return insets;
         });
 
-        LocationService.start(this);
-
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -62,17 +60,20 @@ public class DebugActivity extends CustomActivity {
             }
         };
 
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
-        registerReceiver(receiver, intentFilter);
+        IntentFilter intentFilter = new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_CHANGED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, intentFilter, RECEIVER_EXPORTED);
+        } else
+            registerReceiver(receiver, intentFilter);
 
+        LocationService.startActiveMode(this);
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (LocationService.hasAllPermissions(this))
-            LocationService.start(this);
+            LocationService.startActiveMode(this);
 
         if (requestCode == LocationService.PERMISSION_REQUEST_CODE){
             boolean has = true;
