@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    id 'maven-publish'
 }
 
 android {
@@ -22,6 +23,28 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+publishing {
+    publications {
+        bar(MavenPublication) {
+            groupId "com.github.muhzubairali"
+            artifactId "utils"
+            version "2.0.0"
+            artifact("$buildDir/outputs/aar/Utils-release.aar")
+        }
+    }
+
+    repositories {
+        maven {
+            name "GithubPackages"
+            url uri("https://maven.pkg.github.com/MuhZubairAli/Android-Utilities")
+            credentials {
+                username System.getenv("GITHUB_USER")
+                password System.getenv("GITHUB_USER_TOKEN")
+            }
+        }
     }
 }
 
