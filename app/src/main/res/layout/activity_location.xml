@@ -47,6 +47,30 @@
             android:text="Start Location Service"
             android:id="@+id/btnStart" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Mode Active"
+                android:id="@+id/btnModeActive" />
+            <Button
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Mode Passive"
+                android:id="@+id/btnModePassive" />
+            <Button
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Mode Idle"
+                android:id="@+id/btnModeIdle" />
+        </LinearLayout>
+
         <Button
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -56,19 +80,7 @@
         <Button
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Pause Location Updates"
-            android:id="@+id/btnPause" />
-
-        <Button
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Resume Location Updates"
-            android:id="@+id/btnResume" />
-
-        <Button
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Get Location"
+            android:text="Get Current Location"
             android:id="@+id/btnLocation" />
 
         <Button

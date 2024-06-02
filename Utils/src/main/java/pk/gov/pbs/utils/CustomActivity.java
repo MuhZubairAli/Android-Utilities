@@ -516,7 +516,7 @@ public abstract class CustomActivity extends AppCompatActivity {
                     mLocationService = binder.getService();
                     binder.setLocationChangeCallbacks(mLocationChangeCallbacks);
                     if (!mLocationService.isNetworkProviderEnabled() && !mLocationService.isGpsProviderEnabled())
-                        showLocationSettings(CustomActivity.this.getUXToolkit());
+                        showLocationSettings(getUXToolkit());
 
                     if (mAfterLocationServiceStartCallback != null)
                         mAfterLocationServiceStartCallback.run();
@@ -554,7 +554,7 @@ public abstract class CustomActivity extends AppCompatActivity {
             }
         }
 
-        if (!bindService(intent, mLocationServiceConnection, Context.BIND_IMPORTANT)){
+        if (!bindService(intent, mLocationServiceConnection, Context.BIND_AUTO_CREATE)){
             throw new Exception("startLocationService] - Failed to bind to LocationService");
         }
     }

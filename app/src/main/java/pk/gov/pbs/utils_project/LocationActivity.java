@@ -10,6 +10,8 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -53,7 +55,10 @@ public class LocationActivity extends CustomActivity {
 
         findViewById(R.id.btnStart).setOnClickListener((v) -> {
             try {
-                startLocationService(LocationService.Mode.ACTIVE, this.getClass());
+                if (LocationService.hasRequiredPermissions(this))
+                    startLocationService(LocationService.Mode.ACTIVE, this.getClass());
+                else
+                    mUXToolkit.alert("Required permissions not granted");
             } catch (Exception e) {
                 ExceptionReporter.handle(e);
             }
@@ -78,7 +83,7 @@ public class LocationActivity extends CustomActivity {
             }
         });
         
-        findViewById(R.id.btnPause).setOnClickListener((v) -> {
+        findViewById(R.id.btnModeIdle).setOnClickListener((v) -> {
             if (getLocationService() == null) {
                 mUXToolkit.toast("Location service not started!");
                 return;
@@ -86,12 +91,31 @@ public class LocationActivity extends CustomActivity {
             getLocationService().setModeIdle();
         });
 
-        findViewById(R.id.btnResume).setOnClickListener((v) -> {
+        findViewById(R.id.btnStop).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (getLocationService() == null) {
+                    mUXToolkit.toast("Location service not started!");
+                    return;
+                }
+                stopLocationService();
+            }
+        });
+
+        findViewById(R.id.btnModeActive).setOnClickListener((v) -> {
             if (getLocationService() == null) {
                 mUXToolkit.toast("Location service not started!");
                 return;
             }
             getLocationService().setModeActive();
+        });
+
+        findViewById(R.id.btnModePassive).setOnClickListener((v) -> {
+            if (getLocationService() == null) {
+                mUXToolkit.toast("Location service not started!");
+                return;
+            }
+            getLocationService().setModePassive();
         });
 
         findViewById(R.id.btnPermissions).setOnClickListener((v) -> {
@@ -108,7 +132,7 @@ public class LocationActivity extends CustomActivity {
 
         findViewById(R.id.btnLastKnown).setOnClickListener((v) -> {
             if (getLocationService() == null)
-                mUXToolkit.alert("Location service not started");
+                mUXToolkit.toast("Location service not started");
             else {
                 Location location = getLocationService().getLastKnownLocation();
                 if (location != null) {
@@ -123,6 +147,7 @@ public class LocationActivity extends CustomActivity {
         });
 
         addLocationChangedCallback(location -> {
+            Log.i("===BOUND===", "Location Changed Callback");
             mUXToolkit.alert("Location Received from : "+ location.getProvider(),"This alert is raised from location change callback because service is bound \n<br />" + StaticUtils.toPrettyJson(location));
         });
 
