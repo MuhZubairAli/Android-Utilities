@@ -9,23 +9,21 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class DateTimeUtils {
-    public static final String defaultDateTimeFormat = "dd/MM/yyyy HH:mm:ss";
+public class DateTimeUtil {
+    public static final String defaultDateTimeFormat = "dd/MM/yyyy hh:mm a";
     public static final String defaultDateOnlyFormat = "dd/MM/yyyy";
-    public static final String defaultTimeOnlyFormat = "HH:mm:ss"; //24 hour format
+    public static final String defaultTimeOnlyFormat = "hh:mm:ss a"; //24 hour format
+    public static final String defaultTimeOnlyFormat24Hours = "HH:mm:ss"; //24 hour format
     public static final String sqlTimestampFormat = "yyyy-MM-dd'T'HH:mm:ss";
-    private static Calendar calendar;
     private static final Map<String, SimpleDateFormat> cache = new HashMap<>();
 
     public static Calendar getCalendar(){
-        if (calendar == null)
-            calendar = Calendar.getInstance();
-        return calendar;
+        return Calendar.getInstance();
     }
 
     /**
      * get current time stamp in unix time
-     * @return number of millis since epoch time
+     * @return number of seconds since epoch time
      */
     public static long getCurrentDateTimeUnix(){
         return System.currentTimeMillis() / 1000;
@@ -35,14 +33,22 @@ public class DateTimeUtils {
         return getCalendar().getTime();
     }
 
+    public static String getCurrentDateTimeString() {
+        return getCurrentDateTime(defaultDateTimeFormat);
+    }
+
     public static String getCurrentDateTime(String format){
         if (!cache.containsKey(format))
             cache.put(format, new SimpleDateFormat(format, Locale.getDefault()));
 
-        return cache.get(format).format(getCalendar().getTime());
+        return cache.get(format).format(getCurrentDateTime());
     }
 
-    public static String formatDateTime(String toFormat, long unixTs){
+    public static String formatDateTime(long unix){
+        return formatDateTime(unix, defaultDateTimeFormat);
+    }
+
+    public static String formatDateTime(long unixTs, String toFormat){
         if(!cache.containsKey(toFormat))
             cache.put(toFormat, new SimpleDateFormat(toFormat, Locale.getDefault()));
 
@@ -54,16 +60,27 @@ public class DateTimeUtils {
         return String.valueOf(unixTs);
     }
 
-    public static String formatDateTime(long unix){
-        return formatDateTime(defaultDateTimeFormat, unix);
+    /**
+     * Format date (Date object) to defaultDateTimeFormat
+     * @param subject Date object
+     * @return formatted date string
+     */
+    public static String formatDateTime(Date subject){
+        return formatDateTime(subject, defaultDateTimeFormat);
     }
 
-    public static String formatDateTime(String toFormat, Date subject){
+    /**
+     * Format datetime (Date object) to specified output format (toFormat)
+     * @param subject Date object
+     * @param toFormat output format
+     * @return formatted date string
+     */
+    public static String formatDateTime(Date subject, String toFormat){
         if (subject == null)
             return null;
 
         if(!cache.containsKey(toFormat))
-            cache.put(toFormat, new SimpleDateFormat(toFormat, Locale.UK));
+            cache.put(toFormat, new SimpleDateFormat(toFormat, Locale.getDefault()));
 
         try {
             return cache.get(toFormat).format(subject);
@@ -74,11 +91,14 @@ public class DateTimeUtils {
         return subject.toString();
     }
 
-    public static String formatDateTime(Date subject){
-        return formatDateTime(defaultDateTimeFormat, subject);
-    }
-
-    public static String formatDateTime(String fromFormat, String toFormat, String subject){
+    /**
+     * Format date (subject) in specified format (fromFormat) to specified output format (toFormat)
+     * @param subject date string
+     * @param fromFormat format of date string (subject)
+     * @param toFormat output format
+     * @return formatted date string
+     */
+    public static String formatDateTime(String subject, String fromFormat, String toFormat){
         if (subject == null)
             return null;
 
@@ -97,46 +117,24 @@ public class DateTimeUtils {
         }
     }
 
-    public static String formatDateTime(String fromFormat, String subject){
-        return formatDateTime(fromFormat, defaultDateTimeFormat, subject);
-    }
-
-    //=============== Formatting methods only for Dates for commonly used formats =================
     /**
-     * This is override of formatDateTime(String, String, String)
-     * It formats date from specified format to dd/MM/yyyy
-     * @param fromFormat format of subject
-     * @param subject string date
-     * @return date in dd/MM/yyyy format as string
+     * Format date string to default format for specified dateFormat
+     * @param subject date string
+     * @param fromFormat format of date string (subject)
+     * @return formatted date string to defaultDateTimeFormat
      */
-    public static String formatDateFrom(String fromFormat, String subject){
-        return formatDateTime(fromFormat, "dd/MM/yyyy",subject);
-    }
-
-    /**
-     * This is override of formatDateTime(String, String, String)
-     * it will format date to specified format, it assumes current format of date
-     * is MM/dd/yyyy
-     * @param toFormat target format
-     * @param subject date in string format
-     * @return date in target format from MM/dd/yyyy
-     */
-    public static String formatDateTo(String toFormat, String subject){
-        return formatDateTime("MM/dd/yyyy", toFormat, subject);
-    }
-
-    /**
-     * This is override of formatDateTime(String, String, String) for most used date formats conversion
-     * it will format date from MM/dd/yyyy to dd/MM/yyyy
-     * @param subject date in MM/dd/yyyy format
-     * @return date in dd/MM/yyyy format as string
-     */
-    public static String formatDate(String subject){
-        return formatDateTime("MM/dd/yyyy", "dd/MM/yyyy", subject);
+    public static String formatDateTime(String subject, String fromFormat){
+        return formatDateTime(subject, fromFormat, defaultDateTimeFormat);
     }
 
     //============================== Construct Date object from ===================================
-    public static Date getDateFrom(String format, String subject){
+    /**
+     * Get Date object from string date and specified format
+     * @param subject string date
+     * @param format format of subject
+     * @return Date object
+     */
+    public static Date getDateFrom(String subject, String format){
         if(!cache.containsKey(format))
             cache.put(format, new SimpleDateFormat(format, Locale.getDefault()));
         try {
@@ -147,16 +145,28 @@ public class DateTimeUtils {
         }
     }
 
+    /**
+     * Get Date object from unix timestamp
+     * @param unixInSeconds unix timestamp
+     * @return Date object
+     */
     public static Date getDateFrom(long unixInSeconds){
         return new Date(unixInSeconds*1000L);
     }
 
+    /**
+     *  Get Date object from year, month, day
+     * @param year 4 digit year
+     * @param month 1-12
+     * @param day 1-31
+     * @return Date object
+     */
     public static Date getDateFrom(int year, int month, int day){
-        String format = "dd/MM/yyyy";
+        String format = "MM/dd/yyyy";
         if(!cache.containsKey(format))
             cache.put(format, new SimpleDateFormat(format, Locale.getDefault()));
         try {
-            return cache.get(format).parse(day + "/" + month + "/" + year);
+            return cache.get(format).parse(month + "/" + day + "/" + year);
         } catch (ParseException e) {
             ExceptionReporter.handle(e);
             return null;
@@ -184,7 +194,7 @@ public class DateTimeUtils {
         return TimeUnit
                 .MILLISECONDS
                 .toDays(getDurationBetweenInMillis(fromDate, toDate))
-                / 365L;
+                / 365;
     }
 
     public static long getDurationBetweenIn(TimeUnit timeUnit, Date fromDate, Date toDate) {
@@ -192,6 +202,7 @@ public class DateTimeUtils {
     }
 
     public static int getLeapYearCount(Date fromDate, Date toDate) {
+        Calendar calendar = getCalendar();
         calendar.setTime(fromDate);
         int fy = calendar.get(Calendar.YEAR);
         calendar.setTime(toDate);

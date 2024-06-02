@@ -8,6 +8,7 @@
 
     <string name="title_default_confirm_dialogue">Attention!</string>
     <string name="title_default_alert_dialogue">Alert!</string>
+    <string name="title_default_progress_dialogue">Please wait…</string>
 
     <string name="label_btn_settings">Settings</string>
     <string name="label_btn_location_settings">Open Location Settings</string>
@@ -17,7 +18,7 @@
     <string name="label_btn_request_again">Request Again</string>
     <!-- GPS Setting GPS Alert string -->
     <string name="alert_dialog_gps_title">Location Service Inaccessible</string>
-    <string name="alert_dialog_gps_message">GPS is not enabled or permission not granted, Click Settings to go to location settings menu in order to enable location and grant permission.</string>
+    <string name="alert_dialog_gps_message">If GPS is not enabled or relevant permission not granted to application, then Click Settings to go to Location Settings in order to enable location or grant permission the application.</string>
 
     <!-- Permissions Setting all permissions Alert string -->
     <string name="alert_dialog_all_permissions_title">Enable All Permissions</string>

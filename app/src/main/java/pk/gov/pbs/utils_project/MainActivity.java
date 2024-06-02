@@ -10,6 +10,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import pk.gov.pbs.utils.CustomActivity;
+import pk.gov.pbs.utils.ExceptionReporter;
 
 public class MainActivity extends CustomActivity {
     @Override
@@ -30,6 +31,18 @@ public class MainActivity extends CustomActivity {
 
         findViewById(R.id.btnFileManager).setOnClickListener(v -> {
             startActivity(new Intent(this, FileManagerActivity.class));
+        });
+
+        findViewById(R.id.btnText).setOnClickListener(v -> {
+            startActivity(new Intent(this, TextActivity.class));
+        });
+
+        findViewById(R.id.btnLocation).setOnClickListener(v -> {
+            startActivity(new Intent(this, LocationActivity.class));
+        });
+
+        findViewById(R.id.btnUiux).setOnClickListener(v -> {
+            startActivity(new Intent(this, UxActivity.class));
         });
     }
 }

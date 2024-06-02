@@ -1,5 +1,7 @@
 package pk.gov.pbs.utils_project;
 
+import static pk.gov.pbs.utils_project.Utils.generateText;
+
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.View;
@@ -14,8 +16,10 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import java.io.File;
+import java.io.IOException;
 
 import pk.gov.pbs.utils.CustomActivity;
+import pk.gov.pbs.utils.ExceptionReporter;
 import pk.gov.pbs.utils.FileManager;
 
 public class FileManagerActivity extends CustomActivity {
@@ -35,22 +39,56 @@ public class FileManagerActivity extends CustomActivity {
         ((TextView) findViewById(R.id.tvApiLevel)).setText(Utils.getDeviceOS());
         tblFiles = findViewById(R.id.tblExternalFiles);
         showRootFiles();
+
+        findViewById(R.id.btnCreateFiles).setOnClickListener((view)->{
+            for (int i = 0; i < 5; i++){
+                FileManager.pathToFile("Utils","ZipTest", "files", "file_"+i+".txt").inPublic().append(generateText());
+            }
+            for (int i = 0; i < 10; i++){
+                FileManager.pathToFile("Utils","ZipTest", "files", "more", "file_"+i+".txt").inPublic().append(generateText());
+            }
+            FileManager.pathToDirectory("Utils","ZipTest", "files", "empty").inPublic().createIfNotExists();
+            FileManager.pathToDirectory("Utils","ZipTest", "files", "empty2").inPublic().createIfNotExists();
+            FileManager.pathToDirectory("Utils","ZipTest", "files", "empty3").inPublic().createIfNotExists();
+            mUXToolkit.alert("created multiple files and directories in Utils/ZipTest/files/");
+        });
+
+        findViewById(R.id.btnZipFiles).setOnClickListener((view)->{
+            try {
+                FileManager.pathToDirectory("Utils", "ZipTest", "files").inPublic().compress();
+                getUXToolkit().toast("ZipTest/files compressed successfully");
+            } catch (IOException e) {
+                getUXToolkit().toast("failed to compress ZipTest/files");
+                ExceptionReporter.handle(e);
+            }
+        });
+
+        findViewById(R.id.btnUnzipFiles).setOnClickListener((view)->{
+            try {
+                FileManager.pathToDirectory("Utils", "ZipTest", "files.zip").inPublic().decompress();
+                getUXToolkit().toast("Decompressed successfully");
+            } catch (IOException e) {
+                getUXToolkit().toast("Failed to decompress");
+                ExceptionReporter.handle(e);
+            }
+        });
     }
 
     public void verifyPermissions(View view) {
-        if (FileManager.hasPermissions(this))
-            mUXToolkit.showToast("Has all required permissions for storage access");
+        if (FileManager.hasAllPermissions(this))
+            mUXToolkit.toast("Has all required permissions for storage access");
         else
-            FileManager.requestPermissions(this);
+            FileManager.requestAllPermissions(this);
     }
 
     private void showRootFiles() {
         File root = Environment.getExternalStoragePublicDirectory("Documents").getParentFile();
         if (root != null){
             File[] files = root.listFiles();
-            assert files != null;
-            for (File file : files) {
-                addFileRow(file);
+            if (files != null) {
+                for (File file : files) {
+                    addFileRow(file);
+                }
             }
         }
     }
@@ -68,43 +106,43 @@ public class FileManagerActivity extends CustomActivity {
         String content = ((EditText) findViewById(R.id.etText)).getText().toString();
         if (
                 FileManager
-                        .pathToFile("UtilNewWay","World","External","Test.txt")
+                        .pathToFile("Utils","myText.txt")
                         .inPublic()
                         .write(content)
         )
-            mUXToolkit.showToast("External File Created");
+            mUXToolkit.toast("External File Created");
     }
 
     public void readFileExternal(View view) {
-        String content = FileManager.pathToFile("UtilNewWay","World","External","Test.txt").inPublic().read();
-        mUXToolkit.showAlertDialogue("External Public File", content);
+        String content = FileManager.pathToFile("Utils","myText.txt").inPublic().read();
+        mUXToolkit.alert("External Public File", content);
     }
 
     public void createFilePrivate(View view) {
         String content = ((EditText) findViewById(R.id.etText)).getText().toString();
         if(
                 mFileManager.writeFileString(
-                mFileManager.getFileExternalPrivate("Hello","World","internal.txt"),
+                mFileManager.getFileExternalPrivate("Utils","internal.txt"),
                 content, MODE_APPEND)
         )
-            mUXToolkit.showToast("External Private File Created");
+            mUXToolkit.toast("External Private File Created");
     }
 
     public void readFilePrivate(View view) {
         String content = mFileManager.readFileString(
-                mFileManager.getFileExternalPrivate("Test","Private","File","internal.txt")
+                mFileManager.getFileExternalPrivate("Utils","internal.txt")
         );
-        mUXToolkit.showAlertDialogue("External Private File", content);
+        mUXToolkit.alert("External Private File", content);
     }
     public void createFileInternal(View view) {
         String content = ((EditText) findViewById(R.id.etText)).getText().toString();
         if(mFileManager.writeFileInternal("internal.txt", content, MODE_APPEND))
-            mUXToolkit.showToast("Internal File Created");
+            mUXToolkit.toast("Internal File Created");
     }
 
     public void readFileInternal(View view) {
         String content = mFileManager.readFileInternal("internal.txt");
-        mUXToolkit.showAlertDialogue("Internal Public File", content);
+        mUXToolkit.alert("Internal Public File", content);
     }
 
     public void debug(View view) {
@@ -112,16 +150,15 @@ public class FileManagerActivity extends CustomActivity {
         FileManager.pathToFile("Utils","Test","test.txt").inPublic().append(content);
         FileManager.pathToFile("Utils","Test","test.txt").inPrivate().append(content);
         FileManager.pathToFile("Example", "1.txt").inPrivateCache().append(content);
-        FileManager.pathToFile("Example", "2.txt").inPrivateCache().append(content);
-        FileManager.pathToFile("Test", "3.txt").inPrivateCache().append(content);
+        FileManager.pathToFile("Utils", "Example", "2.txt").inPrivateCache().append(content);
+        FileManager.pathToFile("Utils", "3.txt").inPrivateCache().append(content);
 
-        FileManager.pathToFile("Test", "Utils", "test.txt").inInternal().append(content);
-        FileManager.pathToFile("Test", "text.txt").inInternal().append(content);
+        FileManager.pathToFile("Utils", "Test", "test.txt").inInternal().append(content);
+        FileManager.pathToFile("Utils", "Test", "text.txt").inInternal().append(content);
         FileManager.pathToFile("cache.txt").inInternalCache().append(content);
-        FileManager.pathToFile("Example","1.txt").inInternalCache().append(content);
-        FileManager.pathToFile("Example","2.txt").inInternalCache().append(content);
-        FileManager.pathToFile("Example","3.txt").inInternalCache().append(content);
-
-        mUXToolkit.showToast("Debug completed, files created in all areas");
+        FileManager.pathToFile("Utils", "Example","1.txt").inInternalCache().append(content);
+        FileManager.pathToFile("Utils", "Example","2.txt").inInternalCache().append(content);
+        FileManager.pathToFile("Utils", "Example","3.txt").inInternalCache().append(content);
+        mUXToolkit.toast("Debug completed, files created in all areas");
     }
 }

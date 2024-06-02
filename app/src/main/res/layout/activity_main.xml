@@ -36,7 +36,7 @@
         android:layout_height="wrap_content"
         android:text="File Management" />
     <Button
-        android:id="@+id/btText"
+        android:id="@+id/btnText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Text Formatting and Fonts" />

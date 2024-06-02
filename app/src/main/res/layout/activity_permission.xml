@@ -44,6 +44,47 @@
                 android:backgroundTint="@color/ddColorAccent"
                 android:layout_gravity="right"/>
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Permissions Requested at Runtime"
+                android:background="@color/black"
+                android:textColor="@color/white"
+                android:textAppearance="@style/TextAppearance.AppCompat.Widget.ActionBar.Subtitle"/>
+            <TableLayout
+                android:id="@+id/tblPermsRequested"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <TableRow
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="4"
+                        android:text="Permission Name"
+                        android:background="@color/black"
+                        android:textColor="@color/white"
+                        android:textAppearance="@style/TextAppearance.AppCompat.Widget.ActionBar.Subtitle"/>
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Status"
+                        android:background="@color/black"
+                        android:textColor="@color/white"
+                        android:textAppearance="@style/TextAppearance.AppCompat.Widget.ActionBar.Subtitle"/>
+                </TableRow>
+            </TableLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="All Permissions Declaired in App"
+                android:background="@color/black"
+                android:textColor="@color/white"
+                android:layout_marginTop="@dimen/spaceSmall"
+                android:textAppearance="@style/TextAppearance.AppCompat.Widget.ActionBar.Subtitle"/>
             <TableLayout
                 android:id="@+id/tblPerms"
                 android:layout_width="match_parent"

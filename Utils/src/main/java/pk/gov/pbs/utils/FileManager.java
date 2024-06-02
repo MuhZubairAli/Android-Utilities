@@ -12,7 +12,6 @@ import android.provider.Settings;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 
@@ -24,6 +23,9 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 public class FileManager {
     private static FileManager instance;
@@ -49,18 +51,16 @@ public class FileManager {
                     Manifest.permission.READ_MEDIA_VIDEO
             };
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return new String[]{
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.MANAGE_EXTERNAL_STORAGE
-            };
-        }
 
         return new String[]{
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
         };
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    public static String getManageStoragePermission(){
+        return Manifest.permission.MANAGE_EXTERNAL_STORAGE;
     }
 
     /**
@@ -70,7 +70,16 @@ public class FileManager {
      * Returns true if has all permissions other wise returns false which indicates
      * that one or more permissions regarding storage are not granted
      */
-    public static boolean hasPermissions(Context context) {
+    public static boolean hasAllPermissions(Context context) {
+        boolean readWritePermission = hasRequiredPermissions(context);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return hasFileManagerPermission() && readWritePermission;
+        }
+        return readWritePermission;
+    }
+
+    private static boolean hasRequiredPermissions(Context context) {
         boolean readWritePermission = true;
         for (String permission : getPermissionsRequired()) {
             if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
@@ -78,29 +87,7 @@ public class FileManager {
                 break;
             }
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return hasFileManagerPermission() && hasFileManagerPermission();
-        }
         return readWritePermission;
-    }
-
-    /**
-     * Requests for all storage related permissions
-     * For API >= 30 it opens up the activity to allow current app the permission to manage all files
-     */
-    public static void requestPermissions(Activity context){
-        if (!hasPermissions(context)) {
-            ActivityCompat.requestPermissions(
-                    context,
-                    getPermissionsRequired(),
-                    REQUEST_EXTERNAL_STORAGE_CODE
-            );
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            requestForFileManagerPermission(context);
-        }
     }
 
     /**
@@ -117,6 +104,30 @@ public class FileManager {
     }
 
     /**
+     * Requests for all storage related permissions
+     * For API >= 30 it opens up the activity to allow current app the permission to manage all files
+     */
+    public static void requestAllPermissions(Activity context){
+        requestRequiredPermissions(context);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            StaticUtils.getHandler().post(()->{
+                requestForFileManagerPermission(context);
+            });
+        }
+    }
+
+    private static void requestRequiredPermissions(Activity context) {
+        if (!hasAllPermissions(context)) {
+            ActivityCompat.requestPermissions(
+                    context,
+                    getPermissionsRequired(),
+                    REQUEST_EXTERNAL_STORAGE_CODE
+            );
+        }
+    }
+
+    /**
      * For API >= 30 this method opens screen for allowing current app to be
      * Manage Application for All Files Access Permission
      * This is required for CRUD operations
@@ -124,7 +135,7 @@ public class FileManager {
     @RequiresApi(api = Build.VERSION_CODES.R)
     public static void requestForFileManagerPermission(Context context){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()){
-            Toast.makeText(context, "On API 30 and above permission to manage all files is required, Please enable the option of \'Allow access to manage all files\'.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "On Android 11 and above permission to manage all files is required, Please enable the option of 'Allow access to manage all files'.", Toast.LENGTH_LONG).show();
             Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
             Uri uri = Uri.fromParts("package", context.getPackageName(), null);
             intent.setData(uri);
@@ -289,7 +300,7 @@ public class FileManager {
 
     public File getRootExternalPrivateCache(){
         File[] cacheDirs = mContext.getExternalCacheDirs();
-        File preferredCache = null;
+        File preferredCache = cacheDirs[0];
         long freeSpace = 0;
         for (File cacheDir : cacheDirs) {
             if (cacheDir.canRead() && cacheDir.canWrite()) {
@@ -573,6 +584,14 @@ public class FileManager {
         return DirectoryPath.toDirectory(path);
     }
 
+    public static FileOperator file(File file){
+        return new FileOperator(file);
+    }
+
+    public static DirectoryOperator directory(File file){
+        return new DirectoryOperator(file);
+    }
+
     public static class FilePath {
         private final String[] path;
 
@@ -644,7 +663,18 @@ public class FileManager {
         }
     }
 
-    public static class FileOperator {
+    protected abstract static class FileSystemOperator {
+        public abstract File get();
+        public abstract File createIfNotExists() throws IOException;
+        public boolean delete(){
+            return FileManager.instance.deleteFile(get());
+        }
+        public boolean exists() {
+            return get().exists();
+        }
+    }
+
+    public static class FileOperator extends FileSystemOperator{
         private final File file;
 
         private FileOperator(File file){
@@ -653,7 +683,15 @@ public class FileManager {
             this.file = file;
         }
 
+        @Override
         public File get(){
+            return file;
+        }
+
+        @Override
+        public File createIfNotExists() throws IOException {
+            if (!file.exists())
+                return file.createNewFile() ? file : null;
             return file;
         }
 
@@ -677,24 +715,28 @@ public class FileManager {
         public byte[] readBytes(){
             return FileManager.instance.readFileBytes(file);
         }
-
-        public boolean delete(){
-            return FileManager.instance.deleteFile(file);
-        }
     }
 
-    public static class DirectoryOperator {
+    public static class DirectoryOperator extends FileSystemOperator {
         private final File file;
 
         private DirectoryOperator(File file){
             if (file == null)
-                throw new IllegalArgumentException("file is not provided or is null or does not exists in file system");
-            if (!file.isDirectory())
-                throw new IllegalArgumentException("provided file is not of type Directory");
+                throw new IllegalArgumentException("file is not provided or is null");
+            if (!isZipFile(file) && !file.isDirectory())
+                throw new IllegalArgumentException("provided file is not of type Directory or Zipped directory");
             this.file = file;
         }
 
+        @Override
         public File get(){
+            return file;
+        }
+
+        @Override
+        public File createIfNotExists(){
+            if (!file.exists())
+                return file.mkdirs() ? file : null;
             return file;
         }
 
@@ -706,8 +748,67 @@ public class FileManager {
             return file.listFiles(filenameFilter);
         }
 
+        public int decompress() throws IOException{
+            return decompress(file.getName());
+        }
+
+        public int decompress(String outputDirectoryName) throws IOException {
+            FileInputStream fis = new FileInputStream(file);
+            ZipInputStream zipIn = new ZipInputStream(fis);
+            ZipEntry entry;
+            File extractTo = new File(
+                    file.getParentFile(), outputDirectoryName.replaceAll("\\.[^\\.]+$", "")
+            );
+            if (!extractTo.exists() && !extractTo.mkdirs())
+                throw new IOException("Failed to create directory '"+extractTo.getAbsolutePath()+"'");
+
+            int entryCount = 0;
+            while ((entry = zipIn.getNextEntry()) != null) {
+                String entryName = entry.getName();
+                String outputPath = extractTo + File.separator + entryName;
+                File outputFile = new File(outputPath);
+                if (entry.isDirectory() && !outputFile.exists() && !outputFile.mkdirs()) {
+                    throw new IOException("Failed to create directory '"+entry.getName()+"'");
+                } else if (!entry.isDirectory()){
+                    FileOutputStream fos = new FileOutputStream(outputFile);
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = zipIn.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    fos.close();
+                }
+                zipIn.closeEntry();
+                entryCount++;
+            }
+            zipIn.close();
+            fis.close();
+            return entryCount;
+        }
+
+        public int compress() throws IOException {
+            return compress(file.getName());
+        }
+
+        public int compress(String outputZipFilename) throws IOException{
+            createIfNotExists();
+            File outputZipFile = new File(
+                    file.getParent() + File.separator + sanitizeZipFilename(outputZipFilename)
+            );
+            FileOutputStream fos = new FileOutputStream(outputZipFile);
+            ZipOutputStream zipOut = new ZipOutputStream(fos);
+            int entryCount = compressDir(file, "", zipOut);
+            zipOut.close();
+            fos.close();
+            return entryCount;
+        }
+
         public boolean emptyAndDelete(){
             return doEmpty(file) && file.delete();
+        }
+
+        public boolean empty(){
+            return doEmpty(file);
         }
 
         private boolean doEmpty(File fileToEmpty){
@@ -723,12 +824,40 @@ public class FileManager {
             return true;
         }
 
-        public boolean empty(){
-            return doEmpty(file);
+        private int compressDir(File directory, String parentPath, ZipOutputStream zipOut) throws IOException{
+            int entries = 0;
+            for (File file : directory.listFiles()) {
+                String entryName = parentPath + file.getName();
+                if (file.isDirectory()) {
+                    zipOut.putNextEntry(new ZipEntry(entryName + "/"));
+                    zipOut.closeEntry();
+                    entries += compressDir(file, entryName + "/", zipOut);
+                } else {
+                    zipOut.putNextEntry(new ZipEntry(entryName));
+                    FileInputStream fis = new FileInputStream(file);
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = fis.read(buffer)) != -1) {
+                        zipOut.write(buffer, 0, bytesRead);
+                    }
+                    fis.close();
+                    zipOut.closeEntry();
+                }
+                entries++;
+            }
+            return entries;
         }
 
-        public boolean delete(){
-            return FileManager.instance.deleteFile(file);
+        private boolean isZipFile(File file){
+            return file.getName().endsWith(".zip");
+        }
+
+        private String sanitizeZipFilename(String filename){
+            return filename.
+                    replaceAll("[^a-zA-Z0-9\\.\\s_]", "")
+                    .replaceAll("\\W","_")
+                    .replaceAll("(.zip)$","")
+                    + ".zip";
         }
     }
 }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
@@ -41,6 +42,12 @@
                 android:onClick="verifyPermissions"
                 />
 
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Write Test Files All Locations"
+                android:onClick="debug"
+                />
             <TableLayout
                 android:id="@+id/tblExternalFiles"
                 android:layout_width="match_parent"
@@ -81,54 +88,91 @@
                 android:lines="3"
                 android:hint="Enter file content for file text"/>
 
-            <Button
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Create File External Public"
-                android:onClick="createFileExternal"
-                />
+                app:cardBackgroundColor="@color/dlColorGray2"
+                app:contentPadding="@dimen/spacePrimary"
+                android:layout_marginBottom="@dimen/spaceSmall"
+                android:elevation="4dp">
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Read File External Public"
-                android:onClick="readFileExternal"
-                />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="@dimen/spaceSmall"
+                    android:orientation="vertical">
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Create File External Private"
-                android:onClick="createFilePrivate"
-                />
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="createFileExternal"
+                        android:text="Create Above Text File External Public" />
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Read File External Private"
-                android:onClick="readFilePrivate"
-                />
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="readFileExternal"
+                        android:text="Read File External Public" />
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Create File Internal"
-                android:onClick="createFileInternal"
-                />
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="createFilePrivate"
+                        android:text="Create Above Text File External Private" />
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Read File Internal"
-                android:onClick="readFileInternal"
-                />
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="readFilePrivate"
+                        android:text="Read File External Private" />
 
-            <Button
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="createFileInternal"
+                        android:text="Create Above Text File Internal" />
+
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="readFileInternal"
+                        android:text="Read File Internal" />
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Debug"
-                android:onClick="debug"
-                />
+                app:cardBackgroundColor="@color/dlColorGray2"
+                app:contentPadding="@dimen/spacePrimary"
+                android:elevation="4dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/btnCreateFiles"
+                        android:text="Create Files For Zip" />
+
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/btnZipFiles"
+                        android:text="Zip Files" />
+
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/btnUnzipFiles"
+                        android:text="Unzip files" />
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
         </LinearLayout>
 

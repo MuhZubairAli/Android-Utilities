@@ -13,34 +13,46 @@ public class StaticUtils {
     private static Handler handler;
     public static Handler getHandler(){
         synchronized (StaticUtils.class){
+            Looper looper = Looper.myLooper();
             if (handler == null)
-                handler= new Handler(Looper.getMainLooper());
+                handler= new Handler(looper == null ? Looper.getMainLooper() : looper);
             return handler;
         }
     }
 
     private static Gson gson;
-    public static Gson getGson(boolean prettify, boolean replace) {
+    public static Gson getGson(boolean prettify, boolean excludeNonExpose, boolean replace) {
         synchronized (StaticUtils.class){
             if (gson == null || replace) {
-                gson = prettify ? new GsonBuilder()
-                        .excludeFieldsWithoutExposeAnnotation()
-                        .setPrettyPrinting()
-                        .create()
-                        : new GsonBuilder()
-                        .excludeFieldsWithoutExposeAnnotation()
-                        .create();
+                GsonBuilder gsonBuilder = new GsonBuilder();
+                if (excludeNonExpose)
+                    gsonBuilder.excludeFieldsWithoutExposeAnnotation();
+                if (prettify)
+                    gsonBuilder.setPrettyPrinting();
+                gson = gsonBuilder.create();
             }
             return gson;
         }
     }
 
-    public static Gson getGson(boolean replace) {
-        return getGson(false, replace);
+    public static Gson getGson(boolean prettify, boolean excludeNonExpose) {
+        return getGson(prettify, excludeNonExpose, true);
+    }
+
+    public static Gson getGson(boolean prettify) {
+        return getGson(prettify, false, true);
     }
 
     public static Gson getGson() {
-        return getGson(false, false);
+        return getGson(false, false, false);
+    }
+
+    public static String toPrettyJson(Object object) {
+        return getGson(true).toJson(object);
+    }
+
+    public static String toJson(Object object) {
+        return getGson(false).toJson(object);
     }
 
     private static RequestQueue webRequestQueue;
@@ -50,5 +62,19 @@ public class StaticUtils {
                 webRequestQueue = Volley.newRequestQueue(context);
             return webRequestQueue;
         }
+    }
+
+    public static boolean ClassAChildOfClassB(Class<?> ClassA, Class<?> ClassB){
+        if (ClassA == null || ClassB == null)
+            return false;
+        if (ClassA == ClassB)
+            return true;
+        Class<?> child = ClassA.getSuperclass();
+        while (child != null) {
+            if (child == ClassB)
+                return true;
+            child = child.getSuperclass();
+        }
+        return false;
     }
 }
